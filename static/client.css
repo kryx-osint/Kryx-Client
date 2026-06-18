@@ -1,0 +1,761 @@
+/* Kryx Client — layout overrides on top of static/kryx.css */
+
+.page-client-auth {
+  background: var(--background);
+  overflow-x: hidden;
+}
+
+.client-auth-shell.login-page {
+  min-height: 100vh;
+  position: relative;
+}
+
+.client-auth-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.client-auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.45;
+  animation: client-auth-orb-float 14s ease-in-out infinite;
+}
+
+.client-auth-orb--a {
+  width: 22rem;
+  height: 22rem;
+  top: 8%;
+  left: -6%;
+  background: rgba(0, 210, 239, 0.22);
+}
+
+.client-auth-orb--b {
+  width: 18rem;
+  height: 18rem;
+  bottom: 10%;
+  right: -4%;
+  background: rgba(5, 223, 114, 0.14);
+  animation-delay: -4s;
+}
+
+.client-auth-orb--c {
+  width: 14rem;
+  height: 14rem;
+  top: 42%;
+  left: 38%;
+  background: rgba(0, 210, 239, 0.1);
+  animation-delay: -8s;
+}
+
+@keyframes client-auth-orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(1.5rem, -1rem) scale(1.05);
+  }
+  66% {
+    transform: translate(-1rem, 1.25rem) scale(0.95);
+  }
+}
+
+.client-auth-main {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.client-auth-main:not(:has(.client-login-grid)) {
+  max-width: 28rem;
+}
+
+.client-login-grid {
+  align-items: stretch;
+}
+
+.client-login-showcase {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(0, 210, 239, 0.22);
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--card) 42%, transparent) 0%,
+    color-mix(in oklab, var(--background) 88%, transparent) 100%
+  );
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+}
+
+.client-login-showcase::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(0, 210, 239, 0.06) 45%,
+    transparent 70%
+  );
+  animation: client-login-shimmer 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes client-login-shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateX(-8%);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(8%);
+  }
+}
+
+.client-login-showcase-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.client-login-logo-wrap {
+  position: relative;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.client-login-logo-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 210, 239, 0.35);
+  animation: client-login-ring-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes client-login-ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+.client-login-logo {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 12px rgba(0, 210, 239, 0.35));
+}
+
+.client-login-tagline {
+  min-height: 3.25rem;
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+#client-login-tagline-text {
+  display: inline-block;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+#client-login-tagline-text.is-fading {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.client-login-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.client-login-feature-icon {
+  color: var(--cyan-400);
+  font-size: 0.55rem;
+  line-height: 1.65;
+  flex-shrink: 0;
+}
+
+.client-login-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-top: 1.35rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(5, 223, 114, 0.28);
+  background: rgba(5, 223, 114, 0.06);
+  font-size: 0.78rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.client-login-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #05df72;
+  box-shadow: 0 0 10px rgba(5, 223, 114, 0.75);
+  animation: client-login-status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes client-login-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.client-login-status-text {
+  color: #86efac;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.client-login-status-meta {
+  width: 100%;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.client-login-brand-mark {
+  display: flex;
+  opacity: 1;
+  transform: none;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.client-login-card-wrap {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(0, 210, 239, 0.32);
+  background: color-mix(in oklab, var(--card) 58%, transparent);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(0, 210, 239, 0.08) inset;
+  backdrop-filter: blur(8px);
+}
+
+.client-login-card-glow {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  width: 120%;
+  height: 60%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(0, 210, 239, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+  animation: client-login-card-glow 5s ease-in-out infinite;
+}
+
+@keyframes client-login-card-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.client-login-card-wrap .login-card-head,
+.client-login-form {
+  position: relative;
+  z-index: 1;
+}
+
+.client-login-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.client-login-input-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.client-login-input-wrap .login-input {
+  padding-left: 2.65rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.client-login-input-wrap.is-focused .login-input {
+  border-color: rgba(0, 210, 239, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 210, 239, 0.12);
+}
+
+.client-login-input-wrap.is-focused .client-login-input-icon {
+  color: var(--cyan-400);
+}
+
+.client-login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.client-login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 210, 239, 0.28);
+}
+
+.client-login-submit-arrow {
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.client-login-submit:hover:not(:disabled) .client-login-submit-arrow {
+  transform: translateX(3px);
+}
+
+.client-login-submit-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: client-login-spin 0.7s linear infinite;
+}
+
+.client-login-submit.is-submitting .client-login-submit-label,
+.client-login-submit.is-submitting .client-login-submit-arrow {
+  opacity: 0;
+}
+
+@keyframes client-login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.client-login-disclaimer {
+  position: relative;
+  z-index: 1;
+  margin-top: 1rem;
+}
+
+.client-auth-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.client-login-grid--ready .client-auth-reveal {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 900px) {
+  .client-login-grid.login-grid {
+    grid-template-columns: 1fr;
+    max-width: 28rem;
+    margin: 0 auto;
+  }
+
+  .client-login-showcase {
+    order: 2;
+    padding: 1.35rem;
+  }
+
+  .client-login-card-wrap {
+    order: 1;
+  }
+
+  .client-login-features {
+    display: none;
+  }
+
+  .client-login-brand-mark {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-auth-orb,
+  .client-login-showcase::before,
+  .client-login-logo-ring,
+  .client-login-status-dot,
+  .client-login-card-glow {
+    animation: none;
+  }
+
+  .client-auth-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+.client-flash-stack {
+  margin-bottom: 1rem;
+}
+
+.client-flash-stack--auth {
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.client-brand-tag {
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.workspace-client-main {
+  flex: 1;
+  width: 100%;
+}
+
+.client-page-shell {
+  padding: 1.5rem 1.25rem 3rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.client-page-shell.search-page-shell {
+  max-width: 48rem;
+}
+
+body.page-workspace-contextual .workspace-client-main .workspace-intel-wide {
+  width: 100%;
+  max-width: none;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.client-team-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.client-team-table .client-team-actions-col {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.client-team-table .admin-icon-btn + .admin-icon-btn {
+  margin-left: 0.35rem;
+}
+
+.client-team-username {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--cyan-300);
+}
+
+.client-team-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.client-team-badge--active {
+  border: 1px solid rgba(5, 223, 114, 0.35);
+  background: rgba(5, 223, 114, 0.1);
+  color: #86efac;
+}
+
+.client-team-badge--inactive {
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
+  color: var(--muted-foreground);
+}
+
+.client-team-card .admin-inline-form {
+  margin-top: 0.75rem;
+}
+
+.client-tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.client-tab-bar a {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  text-decoration: none;
+  font-size: 0.82rem;
+}
+
+.client-tab-bar a.active {
+  border-color: rgba(0, 210, 239, 0.45);
+  color: var(--cyan-400);
+  background: rgba(0, 210, 239, 0.08);
+}
+
+.client-chart-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.client-stat-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 1.25rem;
+}
+
+.client-stat-card {
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: color-mix(in oklab, var(--card) 78%, transparent);
+  padding: 1rem 1.05rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+
+.client-stat-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.client-stat-value {
+  margin: 0.35rem 0 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+}
+
+.client-stat-value--sm {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.login-card-wrap .login-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+}
+
+.login-card-wrap .login-help code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85em;
+}
+
+.client-report-filter-section {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.client-report-filter {
+  padding: 1.65rem 1.35rem 1.75rem;
+}
+
+.client-report-filter__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.95rem;
+}
+
+.client-report-filter__eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan-400);
+}
+
+.client-report-filter__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+  max-width: 42rem;
+}
+
+.client-report-filter__status {
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.client-report-filter__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 0.9rem;
+}
+
+.client-report-filter__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.client-report-filter__field--wide {
+  grid-column: 1 / -1;
+}
+
+.client-report-filter__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.client-report-filter__field input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  color: var(--foreground);
+  padding: 0.55rem 0.7rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.client-report-filter__field input:focus {
+  outline: none;
+  border-color: rgba(0, 210, 239, 0.55);
+  box-shadow: 0 0 0 2px rgba(0, 210, 239, 0.12);
+}
+
+.client-report-filter__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding-top: 0.15rem;
+}
+
+button.btn-secondary-outline {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+button.btn-secondary-outline:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.client-setup-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+
+.client-setup-logo-preview {
+  flex-shrink: 0;
+  width: 3.25rem;
+  height: 3.25rem;
+  object-fit: contain;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  padding: 0.35rem;
+}
+
+.client-setup-logo-upload {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.client-setup-logo-input {
+  padding: 0.55rem 0.65rem;
+  font-size: 0.875rem;
+}
+
+.client-settings-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.client-settings-page .admin-head,
+.client-settings-form {
+  max-width: 40rem;
+}
+
+.client-settings-form .admin-panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.client-settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.client-settings-actions {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: 0.15rem;
+}
+
+.client-settings-logo-reset {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  user-select: none;
+}
+
+.client-settings-logo-reset input {
+  accent-color: var(--cyan-400);
+}

@@ -1,0 +1,167 @@
+{# Animated dashboard card + optional contextual block. enable_contextual false = dashboard demo page. report_only = workspace: Intelligence Report shell only (no intro / footer / contextual). #}
+{% if enable_contextual is not defined %}{% set enable_contextual = true %}{% endif %}
+{% if report_only is not defined %}{% set report_only = false %}{% endif %}
+{% if report_wide is not defined %}{% set report_wide = false %}{% endif %}
+<section
+  id="dashboard-preview-section"
+  class="{% if report_only %}dashboard-report-only px-6 py-10{% if report_wide %} workspace-intel-wide{% else %} max-w-6xl mx-auto{% endif %}{% else %}px-6 py-16 max-w-6xl mx-auto min-h-screen flex flex-col justify-center{% endif %}"
+  data-enable-contextual="{{ 'true' if (enable_contextual and not report_only) else 'false' }}"
+>
+  {% if not report_only %}
+  <div class="text-center mb-10">
+    <p class="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2">Dashboard Preview</p>
+    <h2 class="text-2xl font-bold mb-6">Results appear as they're found</h2>
+  </div>
+  {% endif %}
+  {% if report_only %}
+  <div id="intelligence-report-print" class="intelligence-report-print-root">
+  {% endif %}
+  <div class="dashboard-shell" id="preview-root">
+    <div class="px-5 py-3.5 border-b flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <span class="text-sm font-bold">Intelligence Report</span>
+          <span id="report-status"><span class="text-muted-foreground text-xs font-mono">READY</span></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="query-type-label" class="text-10px font-mono uppercase px-2 py-0.5 rounded-full text-cyan-400" style="background: rgba(0, 210, 239, 0.1); border: 1px solid rgba(0, 210, 239, 0.3)">USERNAME</span>
+          <span id="query-value-label" class="text-sm font-mono text-muted-foreground">juandelacruz</span>
+        </div>
+        <div id="report-query-image-block" class="report-query-image-block" hidden>
+          <div id="report-query-image-list" class="report-query-image-list"></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 text-xs font-mono">
+        <span class="text-green-400"><span id="hits-count">0</span> <span id="hits-count-label">HITS</span></span>
+        <span id="miss-chip" class="text-green-400"><span id="miss-count">0</span> <span id="miss-count-label">MATCH</span></span>
+        <span class="text-muted-foreground"><span id="scanned-count">0</span>/169</span>
+      </div>
+    </div>
+    <div class="px-5 py-4 border-b">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          <span>Module Discovery</span>
+          <span id="module-substatus"></span>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-bar-inner" id="progress-inner"></div>
+      </div>
+      <div id="module-pills" class="module-pills-wrap"></div>
+      <p class="text-xs text-muted-foreground font-mono" id="module-status">Waiting to start...</p>
+    </div>
+    <div id="dash-stats-row" class="dash-expandable px-5 py-3 border-b">
+      <div class="stat-grid">
+        <div class="stat-cell">
+          <p id="stat-grid-hits-label" class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Hits</p>
+          <p class="text-lg font-bold text-green-400" id="stat-grid-hits">0</p>
+        </div>
+        <div class="stat-cell">
+          <p id="stat-grid-miss-label" class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Match</p>
+          <p class="text-lg font-bold text-green-400" id="stat-grid-miss">0</p>
+        </div>
+        <div class="stat-cell">
+          <p id="stat-platforms-label" class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Profiles</p>
+          <p class="text-lg font-bold text-cyan-400" id="stat-platforms">0</p>
+        </div>
+        <div class="stat-cell">
+          <p class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Scanned</p>
+          <p class="text-lg font-bold text-amber-400" id="stat-grid-scanned">0/169</p>
+        </div>
+      </div>
+    </div>
+    <div id="dash-split" class="dash-split">
+      <div class="dash-split-inner">
+        <div class="profile-sidebar border-r border-border py-2">
+          <div class="px-3 py-1.5">
+            <span class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Discovered Profiles (<span id="discovered-count">0</span>)</span>
+          </div>
+          <div class="profile-list-select-wrap px-3 pb-2">
+            <label class="profile-list-select-label" for="profile-list-select">Profile</label>
+            <select id="profile-list-select" class="profile-list-select login-input" aria-label="Choose discovered profile"></select>
+          </div>
+          <div id="profile-list" class="profile-list px-1"></div>
+        </div>
+        <div id="profile-detail" class="profile-detail p-5">
+          <div class="flex items-start gap-3 mb-5 flex-wrap">
+            <div id="detail-avatar" class="detail-avatar">JD</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span id="detail-plat" class="profile-plat plat-sky">TELEGRAM</span>
+                <span id="detail-cat" class="detail-cat-badge">SOCIAL</span>
+              </div>
+              <h3 id="detail-name" class="text-lg font-bold">Juan Dela Cruz</h3>
+              <p id="detail-handle" class="text-sm text-muted-foreground">@juandelacruz</p>
+            </div>
+            <span id="view-profile-badge" class="view-profile-badge">View Profile</span>
+          </div>
+          <div class="intel-card rounded-lg border border-border overflow-hidden">
+            <p id="intel-image-restricted-notice" class="intel-image-restricted-notice" hidden>
+              Photos and images from crawled records are hidden on your current plan. Upgrade or apply for Agency package to display/view images.
+            </p>
+            <div class="intel-card-head px-4 py-2 flex flex-col gap-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-10px font-mono uppercase tracking-wider text-muted-foreground">Intelligence Data</span>
+                <span class="text-10px font-mono text-muted-foreground" id="intel-field-count">0 fields</span>
+              </div>
+              <div id="intel-report-selection-bar" class="intel-report-selection-bar" hidden>
+                <p class="intel-report-selection-hint">Choose reliable records to include in the printed report.</p>
+                <div class="intel-report-selection-actions">
+                  <button type="button" class="intel-selection-btn" id="intel-select-all-profile">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 21a8 8 0 0 1 13-6" />
+                      <circle cx="10" cy="8" r="5" />
+                      <path d="m16 19 2 2 4-4" />
+                    </svg>
+                    <span>All on this profile</span>
+                  </button>
+                  <button type="button" class="intel-selection-btn" id="intel-select-none-profile">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 21a8 8 0 0 1 13-6" />
+                      <circle cx="10" cy="8" r="5" />
+                      <path d="m18 17 5 5" />
+                      <path d="m23 17-5 5" />
+                    </svg>
+                    <span>None on this profile</span>
+                  </button>
+                  <button type="button" class="intel-selection-btn" id="intel-select-all-report">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <span>All in report</span>
+                  </button>
+                  <span id="intel-selection-count" class="intel-selection-count"></span>
+                </div>
+              </div>
+            </div>
+            <div id="intel-rows" class="intel-rows"></div>
+          </div>
+          <div id="source-url-block" class="source-url-block rounded-lg border border-border px-4 py-2.5">
+            <span class="text-10px font-mono uppercase tracking-wider text-muted-foreground block mb-0.5">Source URL</span>
+            <span id="source-url-text" class="intel-field-value break-all"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% if report_only %}
+  </div>
+  {% endif %}
+
+  {% if enable_contextual and not report_only %}
+  {% include "partials/contextual_intelligence_block.html" %}
+  {% endif %}
+
+  {% if not report_only %}
+  <div class="flex items-center justify-center py-6">
+    <div class="flex items-center gap-4">
+      <a href="{{ app_url }}" class="link-animated link-animated-cyan text-xs font-mono">Sign up to run your own search</a>
+      <button type="button" class="link-animated" id="replay-btn">Replay</button>
+    </div>
+  </div>
+  {% endif %}
+</section>

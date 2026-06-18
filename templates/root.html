@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Kryx Client{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='kryx.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='client.css') }}" />
+  <link rel="icon" href="{{ client_logo_url }}" />
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col{% block body_class %}{% endblock %}">
+  {% block layout %}{% endblock %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

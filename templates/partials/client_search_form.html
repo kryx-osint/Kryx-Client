@@ -1,0 +1,103 @@
+<form class="login-form search-form landing-preview-search-form" method="post" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+
+  <div class="landing-preview-search-stack" data-search-tabs>
+    <input type="hidden" name="search_type" id="search-type-input" value="{{ active_type }}" />
+
+    <div class="landing-preview-type-rail search-type-rail" role="tablist" aria-label="Search type">
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-username" data-search-tab="username" aria-selected="{{ 'true' if active_type == 'username' else 'false' }}" aria-controls="search-panel-username" tabindex="{{ '0' if active_type == 'username' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='username', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Username</span>
+      </button>
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-name" data-search-tab="name" aria-selected="{{ 'true' if active_type == 'name' else 'false' }}" aria-controls="search-panel-name" tabindex="{{ '0' if active_type == 'name' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='name', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Name</span>
+      </button>
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-phone" data-search-tab="phone" aria-selected="{{ 'true' if active_type == 'phone' else 'false' }}" aria-controls="search-panel-phone" tabindex="{{ '0' if active_type == 'phone' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='phone', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Phone</span>
+      </button>
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-email" data-search-tab="email" aria-selected="{{ 'true' if active_type == 'email' else 'false' }}" aria-controls="search-panel-email" tabindex="{{ '0' if active_type == 'email' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='email', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Email</span>
+      </button>
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-plate_number" data-search-tab="plate_number" aria-selected="{{ 'true' if active_type == 'plate_number' else 'false' }}" aria-controls="search-panel-plate_number" tabindex="{{ '0' if active_type == 'plate_number' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='plate_number', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Plate</span>
+      </button>
+      <button type="button" class="landing-preview-type-chip" role="tab" id="search-tab-passport_number" data-search-tab="passport_number" aria-selected="{{ 'true' if active_type == 'passport_number' else 'false' }}" aria-controls="search-panel-passport_number" tabindex="{{ '0' if active_type == 'passport_number' else '-1' }}">
+        <span class="landing-preview-type-icon-ring">{% with icon_type='passport_number', icon_class='landing-preview-type-icon' %}{% include "partials/search_type_icon.html" %}{% endwith %}</span>
+        <span class="landing-preview-type-label">Passport</span>
+      </button>
+    </div>
+
+    <div class="landing-preview-bar-area">
+      <div id="search-panel-username" class="landing-preview-search-bar" data-search-panel="username" role="tabpanel" aria-labelledby="search-tab-username" {% if active_type != "username" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-username">Username</label>
+        <input id="search-username" class="landing-preview-bar-input" type="text" name="username" placeholder="Handle or alias" autocapitalize="none" value="{{ request.form.get('username', '') }}" {% if active_type != "username" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div id="search-panel-name" class="landing-preview-search-bar landing-preview-search-bar--name" data-search-panel="name" role="tabpanel" aria-labelledby="search-tab-name" {% if active_type != "name" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-first-name">First name</label>
+        <input id="search-first-name" class="landing-preview-bar-input" type="text" name="first_name" placeholder="First name" value="{{ request.form.get('first_name', '') }}" {% if active_type != "name" %}disabled{% endif %} />
+        <span class="landing-preview-bar-divider" aria-hidden="true"></span>
+        <label class="sr-only" for="search-last-name">Last name</label>
+        <input id="search-last-name" class="landing-preview-bar-input" type="text" name="last_name" placeholder="Last name" value="{{ request.form.get('last_name', '') }}" {% if active_type != "name" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div id="search-panel-phone" class="landing-preview-search-bar" data-search-panel="phone" role="tabpanel" aria-labelledby="search-tab-phone" {% if active_type != "phone" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-phone">Phone number</label>
+        <input id="search-phone" class="landing-preview-bar-input" type="tel" name="phone" placeholder="Enter phone number" value="{{ request.form.get('phone', '') }}" {% if active_type != "phone" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div id="search-panel-email" class="landing-preview-search-bar" data-search-panel="email" role="tabpanel" aria-labelledby="search-tab-email" {% if active_type != "email" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-email">Email</label>
+        <input id="search-email" class="landing-preview-bar-input" type="email" name="email" placeholder="Enter email address" value="{{ request.form.get('email', '') }}" {% if active_type != "email" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div id="search-panel-plate_number" class="landing-preview-search-bar" data-search-panel="plate_number" role="tabpanel" aria-labelledby="search-tab-plate_number" {% if active_type != "plate_number" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-plate-number">Plate number</label>
+        <input id="search-plate-number" class="landing-preview-bar-input" type="text" name="plate_number" placeholder="Vehicle registration" autocapitalize="characters" value="{{ request.form.get('plate_number', '') }}" {% if active_type != "plate_number" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div id="search-panel-passport_number" class="landing-preview-search-bar" data-search-panel="passport_number" role="tabpanel" aria-labelledby="search-tab-passport_number" {% if active_type != "passport_number" %}hidden{% endif %}>
+        <svg class="landing-preview-bar-leading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+        <label class="sr-only" for="search-passport-number">Passport number</label>
+        <input id="search-passport-number" class="landing-preview-bar-input" type="text" name="passport_number" placeholder="Travel document ID" autocapitalize="characters" value="{{ request.form.get('passport_number', '') }}" {% if active_type != "passport_number" %}disabled{% endif %} />
+        <button type="submit" class="landing-preview-bar-submit" aria-label="Search">
+          <span class="landing-preview-bar-submit-spinner" aria-hidden="true" hidden></span>
+          <svg class="landing-preview-bar-submit-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <p class="search-bar-hint text-muted-foreground" data-hint="username" {% if active_type != "username" %}hidden{% endif %}>Enter a handle or alias used on social platforms.</p>
+    <p class="search-bar-hint text-muted-foreground" data-hint="name" {% if active_type != "name" %}hidden{% endif %}>Enter first name and last name.</p>
+    <p class="search-bar-hint text-muted-foreground" data-hint="phone" {% if active_type != "phone" %}hidden{% endif %}>Digits only are sent to the search API (spaces, +, and dashes are stripped).</p>
+  </div>
+</form>

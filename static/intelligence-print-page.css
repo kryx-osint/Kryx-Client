@@ -1,0 +1,246 @@
+/* Dedicated print view: white canvas, black type, no panel fills (scoped to body.page-intelligence-print). */
+
+body.page-intelligence-print,
+body.page-intelligence-print .site-main {
+  background: #fff !important;
+  color: #000 !important;
+}
+
+.intelligence-print-page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2rem;
+  background: #fff !important;
+  color: #000 !important;
+}
+
+.intelligence-print-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #ccc;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8125rem;
+}
+
+.intelligence-print-toolbar a,
+.intelligence-print-toolbar button {
+  color: #000;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.intelligence-print-toolbar button:hover,
+.intelligence-print-toolbar a:hover {
+  text-decoration: none;
+}
+
+.intelligence-print-page #dashboard-preview-section {
+  border-top: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.intelligence-print-meta {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 0.8125rem;
+}
+
+.intelligence-print-meta p + p {
+  margin-top: 0.2rem;
+}
+
+.intelligence-print-page,
+.intelligence-print-page * {
+  color: #000 !important;
+}
+
+.intelligence-print-page svg {
+  stroke: #000 !important;
+}
+
+.intelligence-print-page .dashboard-shell,
+.intelligence-print-page .dashboard-shell > div,
+.intelligence-print-page .stat-cell,
+.intelligence-print-page .profile-sidebar,
+.intelligence-print-page .profile-list,
+.intelligence-print-page .profile-detail,
+.intelligence-print-page .intel-card,
+.intelligence-print-page .intel-card-head,
+.intelligence-print-page .intel-rows,
+.intelligence-print-page .source-url-block,
+.intelligence-print-page .detail-avatar,
+.intelligence-print-page .module-pill,
+.intelligence-print-page .module-pill--hit,
+.intelligence-print-page .module-pill--miss,
+.intelligence-print-page .dash-expandable,
+.intelligence-print-page .dash-split,
+.intelligence-print-page .dash-split-inner,
+.intelligence-print-page .hero-board-node,
+.intelligence-print-page .hero-board-ping {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.intelligence-print-page .dashboard-shell {
+  border: 1px solid #000 !important;
+  border-radius: 0 !important;
+}
+
+.intelligence-print-page .border-b,
+.intelligence-print-page .border-r,
+.intelligence-print-page .border-border,
+.intelligence-print-page .rounded-lg,
+.intelligence-print-page .intel-card {
+  border-color: #000 !important;
+}
+
+.intelligence-print-page .profile-plat,
+.intelligence-print-page .detail-cat-badge,
+.intelligence-print-page .view-profile-badge {
+  background: transparent !important;
+  border: 1px solid #000 !important;
+  color: #000 !important;
+}
+
+.intelligence-print-page .progress-bar {
+  height: 6px;
+  border: 1px solid #000;
+  background: transparent !important;
+}
+
+.intelligence-print-page .progress-bar-inner {
+  background: #000 !important;
+}
+
+.intelligence-print-page span[style*="background"] {
+  background: transparent !important;
+  border-color: #000 !important;
+  color: #000 !important;
+}
+
+.intelligence-print-page #intelligence-report-print {
+  background: transparent !important;
+}
+
+.intelligence-print-page .scan-pulse-dot {
+  background: #000 !important;
+}
+
+.intelligence-print-page .divide-y > * {
+  border-color: #ccc !important;
+}
+
+.intelligence-print-page .profile-row,
+.intelligence-print-page .profile-row--active,
+.intelligence-print-page .intel-row {
+  background: transparent !important;
+}
+
+.intelligence-print-link-graph {
+  margin-top: 1.5rem;
+}
+
+.intelligence-print-page .cdr-link-analysis {
+  padding: 0.25rem 0;
+}
+
+.intelligence-print-page .cdr-link-graph-panel {
+  border-color: #ccc !important;
+  background: transparent !important;
+}
+
+.intelligence-print-page .cdr-link-graph-stage {
+  max-height: none !important;
+  min-height: 12rem;
+  overflow: visible !important;
+  background: transparent !important;
+  border: 1px solid #ddd !important;
+}
+
+.intelligence-print-page .cdr-link-graph-svg {
+  max-width: 100%;
+}
+
+.intelligence-print-page .cdr-link-svg-edge--call {
+  stroke: #000 !important;
+  stroke-opacity: 0.35 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-edge--imsi,
+.intelligence-print-page .cdr-link-svg-edge--imei {
+  stroke: #333 !important;
+  stroke-opacity: 0.5 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-orb--phone {
+  fill: #f5f5f5 !important;
+  stroke: #000 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-orb--imsi {
+  fill: #eee !important;
+  stroke: #333 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-orb--imei {
+  fill: #f0f0f0 !important;
+  stroke: #555 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-label,
+.intelligence-print-page .cdr-link-desc,
+.intelligence-print-page .cdr-link-stat-lbl,
+.intelligence-print-page .cdr-link-eyebrow,
+.intelligence-print-page .cdr-link-stat-val {
+  color: #000 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-label {
+  fill: #000 !important;
+}
+
+.intelligence-print-page .cdr-link-svg-label-bg {
+  fill: #fff !important;
+  stroke: #ccc !important;
+}
+
+@media print {
+  .intelligence-print-toolbar {
+    display: none;
+  }
+
+  body.page-intelligence-print .site-main {
+    padding: 0;
+  }
+
+  .intelligence-print-page {
+    padding: 0;
+  }
+
+  .intelligence-print-link-graph {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .intelligence-print-page .cdr-link-analysis {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .intelligence-print-page .cdr-link-graph-stage {
+    overflow: visible !important;
+  }
+}

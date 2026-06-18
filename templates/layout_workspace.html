@@ -1,0 +1,44 @@
+{% extends "root.html" %}
+{% block body_class %} page-workspace-client{% if workspace_page_class %}{{ workspace_page_class }}{% endif %}{% endblock %}
+{% block layout %}
+<div class="workspace-layout">
+  {% include "partials/sidebar.html" %}
+  <div class="workspace-main">
+    <header class="workspace-mobile-topbar" aria-label="Workspace menu">
+      <button
+        type="button"
+        class="workspace-sidebar-toggle nav-menu-toggle"
+        id="workspace-sidebar-toggle"
+        aria-expanded="false"
+        aria-controls="workspace-sidebar-panel"
+        aria-label="Open workspace menu"
+      >
+        <span></span><span></span><span></span>
+      </button>
+      <a href="{{ url_for('dashboard' if is_owner else 'search') }}" class="workspace-mobile-topbar-logo">
+        <img src="{{ client_logo_url }}" alt="" width="24" height="24" />
+        <span class="workspace-mobile-topbar-logo-text">
+          <span class="text-cyan-400">KRY</span><span class="text-foreground">X</span>
+          <span class="client-brand-tag">Client</span>
+        </span>
+      </a>
+    </header>
+    <div class="client-main workspace-client-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="login-flash-stack client-flash-stack" role="alert">
+        {% for category, message in messages %}
+        <p class="login-flash login-flash--{{ category }}">{{ message }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+      {% block page %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='workspace-sidebar-mobile.js') }}" defer></script>
+{{ super() }}
+{% endblock %}

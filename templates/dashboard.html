@@ -1,0 +1,70 @@
+{% extends "layout_workspace.html" %}
+{% block title %}Dashboard — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-page-shell workspace-dashboard-shell">
+  <h1 class="workspace-dashboard-title">Dashboard</h1>
+  <p class="workspace-billing-page-subtitle mb-4">
+    Shared Kryx account: {{ config.kryx_owner_email or '—' }} · {{ config.kryx_package or account.package or '—' }}
+  </p>
+
+  {% if not account %}
+  <p class="login-flash login-flash--error">Could not load account from Kryx. Check server URL and API token in setup.</p>
+  {% else %}
+  <div class="client-stat-grid">
+    <article class="client-stat-card">
+      <p class="client-stat-label">Wallet credits</p>
+      <p class="client-stat-value">{{ account.credits }}</p>
+    </article>
+    <article class="client-stat-card">
+      <p class="client-stat-label">Subscription usage</p>
+      <p class="client-stat-value">{{ account.monthly_search_used }} / {{ account.monthly_search_limit }}</p>
+    </article>
+    <article class="client-stat-card">
+      <p class="client-stat-label">Team members</p>
+      <p class="client-stat-value">{{ team_count }}</p>
+    </article>
+    <article class="client-stat-card">
+      <p class="client-stat-label">Billing period</p>
+      <p class="client-stat-value client-stat-value--sm">{{ account.billing_period_label or '—' }}</p>
+    </article>
+  </div>
+
+  <section class="workspace-dashboard-usage" aria-labelledby="client-usage-heading">
+    <h2 id="client-usage-heading" class="workspace-dashboard-usage-title">Team usage</h2>
+    <div class="client-chart-grid workspace-dashboard-usage-grid">
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Credits remaining</p>
+        <div class="workspace-dashboard-chart-canvas-wrap workspace-dashboard-chart-canvas-wrap--doughnut">
+          <canvas id="chart-credits"></canvas>
+        </div>
+      </article>
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Searches per day</p>
+        <p class="workspace-dashboard-chart-sub">Last 30 days (client log)</p>
+        <div class="workspace-dashboard-chart-canvas-wrap">
+          <canvas id="chart-daily"></canvas>
+        </div>
+      </article>
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Searches per month</p>
+        <div class="workspace-dashboard-chart-canvas-wrap">
+          <canvas id="chart-monthly"></canvas>
+        </div>
+      </article>
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">By team member</p>
+        <div class="workspace-dashboard-chart-canvas-wrap workspace-dashboard-chart-canvas-wrap--bar">
+          <canvas id="chart-actors"></canvas>
+        </div>
+      </article>
+    </div>
+  </section>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script id="client-dashboard-data" type="application/json">{{ charts | tojson }}</script>
+<script src="{{ url_for('static', filename='client-dashboard.js') }}" defer></script>
+{% endblock %}

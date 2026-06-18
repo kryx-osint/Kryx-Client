@@ -1,0 +1,46 @@
+{% extends "root.html" %}
+{% block title %}Print — Intelligence Report — Kryx Client{% endblock %}
+{% block body_class %} page-intelligence-print{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='intelligence-print-page.css') }}" />
+{% endblock %}
+{% block layout %}
+<div class="intelligence-print-page">
+  <header class="intelligence-print-toolbar">
+    <a href="{{ url_for('search_report') }}">← Back to report</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </header>
+  <section class="intelligence-print-meta">
+    <p><strong>Date:</strong> {{ context_payload.meta.created_at or "-" }}</p>
+    <p><strong>Operator:</strong> {{ context_payload.meta.operator or actor }}</p>
+    <p><strong>Query:</strong> {{ context_payload.query.type or "-" }} — {{ context_payload.query.value or "-" }}</p>
+    {% if context_payload.meta.report_id %}
+    <p><strong>Report ID:</strong> {{ context_payload.meta.report_id }}</p>
+    {% endif %}
+  </section>
+  {% with report_only=true, enable_contextual=false %}
+  {% include "partials/dashboard_preview_section.html" %}
+  {% endwith %}
+
+  <section class="intelligence-print-link-graph" aria-label="Record link analysis">
+    <div class="dashboard-shell">
+      <div class="px-5 py-3 border-b">
+        <span class="text-xs font-mono uppercase tracking-wider text-cyan-400">Record link analysis</span>
+      </div>
+      <div class="px-5 py-4">
+        <p class="text-xs text-muted-foreground mb-3" id="workspace-relationship-graph-hint">
+          PhoneID_1 ↔ PhoneID_2 call links with IMSI and IMEI from consolidated records.
+        </p>
+        <div id="workspace-relationship-graph"></div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/kryx-preview-common.js') }}"></script>
+<script>
+  window.workspaceContextPayload = {{ context_payload | tojson }};
+</script>
+<script src="{{ url_for('static', filename='workspace-contextual-live.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "layout_auth.html" %}
+{% block title %}Sign in — Kryx Client{% endblock %}
+{% block page %}
+<div class="client-login-grid login-grid" id="client-login-root">
+  <aside class="client-login-showcase login-copy" aria-label="Workspace overview">
+    <div class="client-login-showcase-inner">
+      <div class="client-login-logo-wrap client-auth-reveal" style="--reveal-delay: 0ms">
+        <span class="client-login-logo-ring" aria-hidden="true"></span>
+        <img src="{{ client_logo_url }}" alt="" width="52" height="52" class="client-login-logo" />
+      </div>
+      <p class="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2 client-auth-reveal" style="--reveal-delay: 80ms">Team workspace</p>
+      <h1 class="text-3xl font-bold mb-3 client-auth-reveal" style="--reveal-delay: 140ms">{{ org_name or 'Kryx Client' }}</h1>
+      <p class="text-muted-foreground client-login-tagline client-auth-reveal" style="--reveal-delay: 200ms">
+        <span id="client-login-tagline-text" aria-live="polite">Shared investigations for your agency network.</span>
+      </p>
+
+      <ul class="client-login-features login-feature-list client-auth-reveal" style="--reveal-delay: 280ms">
+        <li><span class="client-login-feature-icon" aria-hidden="true">◆</span> Unified search across your Kryx credits</li>
+        <li><span class="client-login-feature-icon" aria-hidden="true">◆</span> Owner-managed team accounts</li>
+        <li><span class="client-login-feature-icon" aria-hidden="true">◆</span> Intelligence reports, print &amp; export</li>
+        <li><span class="client-login-feature-icon" aria-hidden="true">◆</span> Audit trail for every sign-in &amp; query</li>
+      </ul>
+
+      <div class="client-login-status client-auth-reveal" style="--reveal-delay: 360ms">
+        <span class="client-login-status-dot" aria-hidden="true"></span>
+        <span class="client-login-status-text">Private network workspace</span>
+        {% if config and config.kryx_owner_email %}
+        <span class="client-login-status-meta">Linked: {{ config.kryx_owner_email }}</span>
+        {% endif %}
+      </div>
+
+      <div class="client-login-brand-mark login-brand-mark client-auth-reveal" style="--reveal-delay: 420ms">
+        <div class="client-login-brand-mark-text">
+          <p class="login-brand-mark-name">
+            <span class="text-cyan-400">KRY</span><span class="text-foreground">X</span>
+            <span class="client-brand-tag">Client</span>
+          </p>
+          <p class="text-sm font-mono tracking-hero text-muted-foreground">Installed for your organization</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="client-login-card-wrap login-card-wrap client-auth-reveal" style="--reveal-delay: 180ms">
+    <div class="client-login-card-glow" aria-hidden="true"></div>
+    <div class="login-card-head">
+      <p class="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2">Secure access</p>
+      <h2 class="text-2xl font-bold mb-2">Sign in</h2>
+      <p class="text-sm text-muted-foreground">Owner or team member credentials for this workspace.</p>
+    </div>
+    <form class="login-form client-login-form" method="post" autocomplete="on" id="client-login-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label class="login-field client-login-field">
+        <span class="login-label">Username</span>
+        <span class="client-login-input-wrap">
+          <svg class="client-login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input class="login-input" name="username" required autocomplete="username" placeholder="Your workspace username" />
+        </span>
+      </label>
+      <label class="login-field client-login-field">
+        <span class="login-label">Password</span>
+        <span class="client-login-input-wrap">
+          <svg class="client-login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input class="login-input" type="password" name="password" required autocomplete="current-password" placeholder="Enter password" />
+        </span>
+      </label>
+      <button type="submit" class="btn-primary btn-block client-login-submit" id="client-login-submit">
+        <span class="client-login-submit-label">Sign in to workspace</span>
+        <span class="client-login-submit-spinner" aria-hidden="true" hidden></span>
+        <svg class="client-login-submit-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </form>
+    <p class="login-disclaimer client-login-disclaimer">
+      Authorized investigative use only. Activity is logged on this workspace server.
+    </p>
+  </div>
+</div>
+{% endblock %}

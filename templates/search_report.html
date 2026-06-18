@@ -1,0 +1,87 @@
+{% extends "layout_workspace.html" %}
+{% block title %}Intelligence Report — Kryx Client{% endblock %}
+{% block page %}
+<div class="workspace-intel-actions workspace-intel-wide px-6 flex flex-wrap items-center justify-between gap-3">
+  <a href="{{ url_for('search') }}" class="workspace-intel-back link-animated link-animated-cyan text-sm font-mono">← New search</a>
+  <div class="workspace-intel-btn-row">
+    <a href="{{ url_for('search_export_csv') }}" class="btn-secondary-outline workspace-intel-action-btn">Export CSV</a>
+    <a
+      href="{{ url_for('search_print') }}"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn-primary workspace-intel-print-btn"
+      id="workspace-intel-print-btn"
+      aria-label="Open printable intelligence report"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+        <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6" />
+        <rect x="6" y="14" width="12" height="8" rx="1" />
+      </svg>
+      Print
+    </a>
+  </div>
+</div>
+
+<section class="workspace-intel-wide px-6 client-report-filter-section">
+  <div id="client-report-filter-panel" class="client-report-filter dashboard-shell">
+    <div class="client-report-filter__head">
+      <div>
+        <p class="client-report-filter__eyebrow">Advanced filtering</p>
+        <p class="client-report-filter__hint">Narrow results by middle name, birthday, or wildcard text. Only matching records are shown.</p>
+      </div>
+      <p class="client-report-filter__status" data-filter-status aria-live="polite"></p>
+    </div>
+    <div class="client-report-filter__grid">
+      <label class="client-report-filter__field">
+        <span class="client-report-filter__label">Middle name</span>
+        <input type="text" data-filter="middle-name" placeholder="Enter middle name" autocomplete="off" />
+      </label>
+      <label class="client-report-filter__field">
+        <span class="client-report-filter__label">Birthday</span>
+        <input type="text" data-filter="birthday" placeholder="Enter date of birth" autocomplete="off" />
+      </label>
+      <label class="client-report-filter__field client-report-filter__field--wide">
+        <span class="client-report-filter__label">Wildcard search</span>
+        <input type="text" data-filter="wildcard" placeholder="Search text or pattern" autocomplete="off" />
+      </label>
+    </div>
+    <div class="client-report-filter__actions">
+      <button type="button" class="btn-primary workspace-intel-action-btn" data-filter-apply>Apply filters</button>
+      <button type="button" class="btn-secondary-outline workspace-intel-action-btn" data-filter-clear>Clear</button>
+    </div>
+  </div>
+</section>
+
+<section class="workspace-intel-wide px-6 pb-2">
+  {% with report_only=true, enable_contextual=false, report_wide=true %}
+  {% include "partials/dashboard_preview_section.html" %}
+  {% endwith %}
+</section>
+
+<section class="workspace-intel-wide px-6 pb-10">
+  <div class="dashboard-shell">
+    <div class="px-5 py-3 border-b">
+      <span class="text-xs font-mono uppercase tracking-wider text-cyan-400">Relationship Graph</span>
+    </div>
+    <div class="px-5 py-4">
+      <p class="text-xs text-muted-foreground mb-3" id="workspace-relationship-graph-hint">
+        Linked using discovered JSON keys from this result. Record consolidated results use PhoneID_1 ↔ PhoneID_2 link analysis.
+      </p>
+      <div id="workspace-relationship-graph"></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/kryx-preview-common.js') }}"></script>
+<script>
+  window.workspaceContextPayload = {{ context_payload | tojson }};
+  window.kryxClientCsrfToken = {{ csrf_token | tojson }};
+  window.kryxReportContextSyncUrl = {{ url_for('search_report_context_sync') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='client-report-filter.js') }}" defer></script>
+<script src="{{ url_for('static', filename='workspace-contextual-live.js') }}" defer></script>
+{% endblock %}

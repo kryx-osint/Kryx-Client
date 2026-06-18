@@ -1,0 +1,59 @@
+{% extends "layout_workspace.html" %}
+{% block title %}Logs — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-page-shell admin-shell">
+  <header class="admin-head">
+    <div>
+      <p class="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2">Audit</p>
+      <h1 class="text-2xl font-bold">Logs</h1>
+    </div>
+  </header>
+
+  <nav class="admin-tabs client-tab-bar" aria-label="Log type">
+    <a href="{{ url_for('logs', tab='search') }}" class="admin-tab{% if tab == 'search' %} admin-tab--active{% endif %}">Search logs</a>
+    <a href="{{ url_for('logs', tab='audit') }}" class="admin-tab{% if tab == 'audit' %} admin-tab--active{% endif %}">Audit logs</a>
+  </nav>
+
+  <div class="admin-panel admin-panel--raised mt-4">
+    {% if tab == 'audit' %}
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody>
+          {% for row in audit_logs %}
+          <tr>
+            <td>{{ row.created_at }}</td>
+            <td>{{ row.actor }}</td>
+            <td>{{ row.action }}</td>
+            <td>{{ row.details }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">No audit entries.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Time</th><th>User</th><th>Type</th><th>Query</th><th>Status</th><th>Credits left</th></tr></thead>
+        <tbody>
+          {% for row in search_logs %}
+          <tr>
+            <td>{{ row.created_at }}</td>
+            <td>{{ row.actor }}</td>
+            <td>{{ row.search_type }}</td>
+            <td>{{ row.query_value }}</td>
+            <td>{% if row.ok %}OK{% else %}{{ row.error or 'Failed' }}{% endif %}</td>
+            <td>{{ row.credits_remaining if row.credits_remaining is not none else '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6">No searches logged yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
