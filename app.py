@@ -315,6 +315,8 @@ def inject_globals():
     actor = _actor_label()
     initials = (actor.replace(".", "").replace("_", "")[:2] or "U").upper()
     show_workspace = bool(session.get(SESSION_ACTOR) and endpoint not in {"setup", "login"})
+    cfg = _config(load_store())
+    org_name = (cfg.get("organization_name") or "My team").strip() or "My team"
     return {
         "csrf_token": _csrf_token(),
         "is_owner": _is_owner(),
@@ -323,6 +325,7 @@ def inject_globals():
         "workspace_nav_endpoint": endpoint,
         "show_workspace": show_workspace,
         "client_logo_url": _client_logo_url(),
+        "client_org_name": org_name,
     }
 
 

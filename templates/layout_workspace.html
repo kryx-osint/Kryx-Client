@@ -17,10 +17,7 @@
       </button>
       <a href="{{ url_for('dashboard' if is_owner else 'search') }}" class="workspace-mobile-topbar-logo">
         <img src="{{ client_logo_url }}" alt="" width="24" height="24" />
-        <span class="workspace-mobile-topbar-logo-text">
-          <span class="text-cyan-400">KRY</span><span class="text-foreground">X</span>
-          <span class="client-brand-tag">Client</span>
-        </span>
+        <span class="workspace-mobile-topbar-logo-text client-org-brand" title="{{ client_org_name }}">{{ client_org_name }}</span>
       </a>
     </header>
     <div class="client-main workspace-client-main">
