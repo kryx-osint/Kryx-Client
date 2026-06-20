@@ -24,32 +24,8 @@
   </div>
 </section>
 
-<div id="search-loading-overlay" class="search-loading-overlay" aria-live="polite" hidden>
-  <div class="search-loading-overlay-card" role="status" aria-label="Searching">
-    <span class="search-loading-overlay-spinner" aria-hidden="true"></span>
-    <span class="sr-only">Search in progress. Please wait.</span>
-    <p class="search-loading-overlay-text">Querying connected sources…</p>
-    <div class="search-social-crawl" aria-hidden="true">
-      <div class="search-social-crawl-rows">
-        <div class="search-social-crawl-row">
-          <span class="search-social-host" id="search-social-host-a">gov.ph</span>
-          <span class="search-social-phase" id="search-social-phase-a">connecting</span>
-        </div>
-        <div class="search-social-crawl-row">
-          <span class="search-social-host" id="search-social-host-b">facebook.com</span>
-          <span class="search-social-phase" id="search-social-phase-b">resolving</span>
-        </div>
-        <div class="search-social-crawl-row">
-          <span class="search-social-host" id="search-social-host-c">instagram.com</span>
-          <span class="search-social-phase" id="search-social-phase-c">routing</span>
-        </div>
-      </div>
-      <div class="search-crawl-progress">
-        <span class="search-crawl-progress-bar"></span>
-      </div>
-    </div>
-  </div>
-</div>
+<script type="application/json" id="search-crawl-hosts-data">["gov.ph","facebook.com","instagram.com","linkedin.com","twitter.com"]</script>
+{% include "partials/search_loading_overlay.html" %}
 {% endblock %}
 
 {% block scripts %}

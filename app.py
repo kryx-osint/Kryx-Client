@@ -7,6 +7,8 @@ import io
 import mimetypes
 import os
 import secrets
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
@@ -37,6 +39,7 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import kryx_api
+import system_stats
 import user_intel
 from kryx_api import KryxApiError
 from store import (
@@ -87,6 +90,11 @@ _SEARCH_EMPTY_MESSAGES = {
     "passport_number": "Enter a passport number.",
 }
 
+CLIENT_SEARCH_JOBS: Dict[str, Dict[str, Any]] = {}
+_CLIENT_SEARCH_JOBS_LOCK = threading.Lock()
+CLIENT_SEARCH_JOB_TTL_SEC = max(60, int(os.environ.get("KRYX_CLIENT_SEARCH_JOB_TTL", "3600")))
+CLIENT_SEARCH_JOB_MAX = max(10, int(os.environ.get("KRYX_CLIENT_SEARCH_JOB_MAX", "200")))
+
 
 def _search_fields_from_request(active_type: str, form) -> tuple[Dict[str, str], str, Optional[str]]:
     """Collect submitted fields for the active search type; return (fields, display, error)."""
@@ -111,6 +119,169 @@ def _search_fields_from_request(active_type: str, form) -> tuple[Dict[str, str],
     if not query_display:
         return fields, query_display, _SEARCH_EMPTY_MESSAGES.get(active_type, "Enter a search value.")
     return fields, query_display, None
+
+
+def _client_search_job_purge() -> None:
+    now = time.time()
+    with _CLIENT_SEARCH_JOBS_LOCK:
+        expired = [
+            jid
+            for jid, row in CLIENT_SEARCH_JOBS.items()
+            if now - float(row.get("created_at") or now) > CLIENT_SEARCH_JOB_TTL_SEC
+        ]
+        for jid in expired:
+            CLIENT_SEARCH_JOBS.pop(jid, None)
+        if len(CLIENT_SEARCH_JOBS) <= CLIENT_SEARCH_JOB_MAX:
+            return
+        ordered = sorted(
+            CLIENT_SEARCH_JOBS.items(),
+            key=lambda item: float(item[1].get("created_at") or 0),
+        )
+        for jid, _row in ordered[: max(0, len(CLIENT_SEARCH_JOBS) - CLIENT_SEARCH_JOB_MAX)]:
+            CLIENT_SEARCH_JOBS.pop(jid, None)
+
+
+def _client_search_job_create(
+    actor: str,
+    *,
+    search_type: str,
+    fields: Dict[str, str],
+    query_display: str,
+) -> str:
+    _client_search_job_purge()
+    job_id = secrets.token_urlsafe(12)
+    now = time.time()
+    with _CLIENT_SEARCH_JOBS_LOCK:
+        CLIENT_SEARCH_JOBS[job_id] = {
+            "job_id": job_id,
+            "actor": (actor or "").strip(),
+            "search_type": search_type,
+            "fields": dict(fields),
+            "query_display": query_display,
+            "status": "queued",
+            "upstream_status": None,
+            "error": "",
+            "redirect": "",
+            "session_applied": False,
+            "api_data": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+    return job_id
+
+
+def _finalize_client_search_success(
+    store: Dict[str, Any],
+    *,
+    search_type: str,
+    query_display: str,
+    data: Dict[str, Any],
+    credits_left: int,
+    actor: str,
+) -> str:
+    result = data.get("result")
+    query_meta = data.get("query") if isinstance(data.get("query"), dict) else {}
+    if not query_meta:
+        query_meta = {"type": search_type.upper(), "value": query_display}
+    account = _fetch_account(store)
+    context_payload = _build_search_context_payload(
+        result,
+        query_meta,
+        account,
+        actor=actor,
+    )
+    _save_session_search_context(store, context_payload)
+    append_search_log(
+        store,
+        actor=actor,
+        search_type=search_type,
+        query_value=query_display,
+        ok=True,
+        credits_remaining=credits_left,
+    )
+    append_audit(store, actor, "search", f"{search_type}: {query_display}")
+    cfg = _config(store)
+    cfg["last_known_credits"] = credits_left
+    store["config"] = cfg
+    save_store(store)
+    return url_for("search_report")
+
+
+def _run_client_search_job(job_id: str) -> None:
+    with app.app_context():
+        with _CLIENT_SEARCH_JOBS_LOCK:
+            job = CLIENT_SEARCH_JOBS.get(job_id)
+            if not job:
+                return
+            actor = job["actor"]
+            search_type = job["search_type"]
+            fields = dict(job.get("fields") or {})
+            query_display = job.get("query_display") or ""
+            job["status"] = "running"
+            job["upstream_status"] = "running"
+            job["updated_at"] = time.time()
+
+        store = load_store()
+        base, token = _kryx_credentials(store)
+        account = _fetch_account(store)
+        if account and account.get("expired"):
+            err = "Kryx account expired. Renew on Kryx Billing."
+            with _CLIENT_SEARCH_JOBS_LOCK:
+                row = CLIENT_SEARCH_JOBS.get(job_id)
+                if row:
+                    row["status"] = "failed"
+                    row["error"] = err
+                    row["updated_at"] = time.time()
+            append_search_log(
+                store,
+                actor=actor,
+                search_type=search_type,
+                query_value=query_display,
+                ok=False,
+                credits_remaining=None,
+                error=err,
+            )
+            append_audit(store, actor, "search_failed", err)
+            save_store(store)
+            return
+
+        try:
+            data, credits_left = kryx_api.search(
+                base, token, search_type=search_type, fields=fields
+            )
+            with _CLIENT_SEARCH_JOBS_LOCK:
+                row = CLIENT_SEARCH_JOBS.get(job_id)
+                if not row:
+                    return
+                row["status"] = "done"
+                row["upstream_status"] = "done"
+                row["api_data"] = data
+                row["credits_left"] = credits_left
+                row["error"] = ""
+                row["updated_at"] = time.time()
+        except KryxApiError as exc:
+            msg = str(exc)
+            if exc.code == "invalid_token":
+                msg += " Update the API token under Settings (owner login)."
+            with _CLIENT_SEARCH_JOBS_LOCK:
+                row = CLIENT_SEARCH_JOBS.get(job_id)
+                if row:
+                    row["status"] = "failed"
+                    row["error"] = msg
+                    row["upstream_status"] = "failed"
+                    row.pop("api_data", None)
+                    row["updated_at"] = time.time()
+            append_search_log(
+                store,
+                actor=actor,
+                search_type=search_type,
+                query_value=query_display,
+                ok=False,
+                credits_remaining=None,
+                error=str(exc),
+            )
+            append_audit(store, actor, "search_failed", str(exc))
+            save_store(store)
 
 
 def _utc_now() -> str:
@@ -303,7 +474,7 @@ def guard_setup_and_csrf():
     if request.method == "POST" and endpoint not in {"setup", "login"}:
         token = (request.form.get("csrf_token") or request.headers.get("X-CSRF-Token") or "").strip()
         if not _valid_csrf(token):
-            if endpoint == "search_report_context_sync":
+            if endpoint in {"search_report_context_sync", "search_jobs_create"}:
                 return jsonify({"ok": False, "error": "Security check failed."}), 403
             flash("Security check failed. Refresh and try again.", "error")
             return redirect(request.referrer or url_for("dashboard"))
@@ -631,6 +802,20 @@ def settings():
     return render_template("settings.html", config=cfg)
 
 
+@app.route("/dashboard/api/system-memory", endpoint="dashboard_api_system_memory")
+@_require_login
+@_require_owner
+def dashboard_api_system_memory():
+    return jsonify(system_stats.system_memory_snapshot())
+
+
+@app.route("/dashboard/api/system-cpu", endpoint="dashboard_api_system_cpu")
+@_require_login
+@_require_owner
+def dashboard_api_system_cpu():
+    return jsonify(system_stats.system_cpu_snapshot())
+
+
 @app.route("/dashboard")
 @_require_login
 @_require_owner
@@ -645,6 +830,99 @@ def dashboard():
         config=_config(store),
         team_count=len(store.get("team", [])),
     )
+
+
+@app.route("/search/jobs", methods=["POST"], endpoint="search_jobs_create")
+@_require_login
+def search_jobs_create():
+    """Start an async client search; browser polls GET /search/jobs/<id>."""
+    store = load_store()
+    account = _fetch_account(store)
+    active_type = (request.form.get("search_type") or "username").strip()
+    if active_type not in SEARCH_TYPES:
+        active_type = "username"
+
+    fields, query_display, validation_error = _search_fields_from_request(active_type, request.form)
+    if validation_error:
+        return jsonify({"ok": False, "error": validation_error}), 400
+    if account and account.get("expired"):
+        return jsonify({"ok": False, "error": "Kryx account expired. Renew on Kryx Billing."}), 400
+
+    actor = _actor_label()
+    job_id = _client_search_job_create(
+        actor,
+        search_type=active_type,
+        fields=fields,
+        query_display=query_display,
+    )
+    threading.Thread(target=_run_client_search_job, args=(job_id,), daemon=True).start()
+    return jsonify({"ok": True, "job_id": job_id, "status": "queued"}), 202
+
+
+@app.route("/search/jobs/<job_id>", methods=["GET"], endpoint="search_jobs_poll")
+@_require_login
+def search_jobs_poll(job_id: str):
+    """Poll client-side search job; applies session when Kryx API search completes."""
+    jid = (job_id or "").strip()
+    actor = _actor_label()
+    apply_now = False
+    api_data: Dict[str, Any] = {}
+    search_type = ""
+    query_display = ""
+    credits_left = 0
+
+    with _CLIENT_SEARCH_JOBS_LOCK:
+        row = CLIENT_SEARCH_JOBS.get(jid)
+        if not row or (row.get("actor") or "").strip() != actor:
+            return jsonify({"ok": False, "error": "Job not found."}), 404
+        if row.get("status") == "done" and not row.get("session_applied"):
+            apply_now = True
+            api_data = dict(row.get("api_data") or {})
+            search_type = row.get("search_type") or "username"
+            query_display = row.get("query_display") or ""
+            credits_left = int(row.get("credits_left") or 0)
+            row["session_applied"] = True
+
+    if apply_now:
+        store = load_store()
+        try:
+            redirect_url = _finalize_client_search_success(
+                store,
+                search_type=search_type,
+                query_display=query_display,
+                data=api_data,
+                credits_left=credits_left,
+                actor=actor,
+            )
+            with _CLIENT_SEARCH_JOBS_LOCK:
+                row = CLIENT_SEARCH_JOBS.get(jid)
+                if row:
+                    row["redirect"] = redirect_url
+                    row.pop("api_data", None)
+        except Exception:
+            with _CLIENT_SEARCH_JOBS_LOCK:
+                row = CLIENT_SEARCH_JOBS.get(jid)
+                if row:
+                    row["status"] = "failed"
+                    row["error"] = "Search could not be finalized. Please try again."
+                    row.pop("api_data", None)
+
+    with _CLIENT_SEARCH_JOBS_LOCK:
+        row = CLIENT_SEARCH_JOBS.get(jid) or {}
+
+    payload: Dict[str, Any] = {
+        "ok": True,
+        "job_id": jid,
+        "status": row.get("status") or "queued",
+    }
+    upstream_status = row.get("upstream_status")
+    if upstream_status:
+        payload["upstream_status"] = upstream_status
+    if row.get("status") == "done" and row.get("redirect"):
+        payload["redirect"] = row["redirect"]
+    if row.get("status") == "failed":
+        payload["error"] = row.get("error") or "Search failed."
+    return jsonify(payload)
 
 
 @app.route("/search", methods=["GET", "POST"], endpoint="search")
@@ -670,30 +948,14 @@ def search_page():
                 data, credits_left = kryx_api.search(
                     base, token, search_type=active_type, fields=fields
                 )
-                result = data.get("result")
-                query_meta = data.get("query") if isinstance(data.get("query"), dict) else {}
-                if not query_meta:
-                    query_meta = {"type": active_type.upper(), "value": query_display}
-                context_payload = _build_search_context_payload(
-                    result,
-                    query_meta,
-                    account,
-                    actor=_actor_label(),
-                )
-                _save_session_search_context(store, context_payload)
-                append_search_log(
+                _finalize_client_search_success(
                     store,
-                    actor=_actor_label(),
                     search_type=active_type,
-                    query_value=query_display,
-                    ok=True,
-                    credits_remaining=credits_left,
+                    query_display=query_display,
+                    data=data,
+                    credits_left=credits_left,
+                    actor=_actor_label(),
                 )
-                append_audit(store, _actor_label(), "search", f"{active_type}: {query_display}")
-                cfg = _config(store)
-                cfg["last_known_credits"] = credits_left
-                store["config"] = cfg
-                save_store(store)
                 return redirect(url_for("search_report"))
             except KryxApiError as exc:
                 append_search_log(

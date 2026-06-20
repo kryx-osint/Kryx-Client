@@ -1,0 +1,71 @@
+<div id="search-loading-overlay" class="search-loading-overlay" aria-live="polite" aria-busy="false" hidden>
+  <div class="search-loading-overlay-bg search-loading-overlay-bg--client" aria-hidden="true">
+    <div class="search-loading-overlay-bg-shade"></div>
+  </div>
+  <div class="search-loading-overlay-card" id="search-loading-overlay-card" role="status" aria-label="Search queued">
+    <div class="search-loading-overlay-head">
+      <span class="search-loading-overlay-pulse" id="search-job-type-pulse" aria-hidden="true"></span>
+      <div class="search-loading-overlay-head-copy">
+        <p class="search-loading-overlay-kicker">Workspace search</p>
+        <p class="search-loading-overlay-title">Investigation in progress</p>
+      </div>
+    </div>
+
+    <ol class="search-loading-overlay-steps" id="search-job-steps" aria-label="Search progress">
+      <li class="search-loading-overlay-step" data-step="queued">
+        <span class="search-loading-overlay-step-dot" aria-hidden="true"></span>
+        <span class="search-loading-overlay-step-label">Queued</span>
+      </li>
+      <li class="search-loading-overlay-step" data-step="scanning">
+        <span class="search-loading-overlay-step-dot" aria-hidden="true"></span>
+        <span class="search-loading-overlay-step-label">Scanning</span>
+      </li>
+      <li class="search-loading-overlay-step" data-step="report">
+        <span class="search-loading-overlay-step-dot" aria-hidden="true"></span>
+        <span class="search-loading-overlay-step-label">Report</span>
+      </li>
+    </ol>
+
+    <p class="search-loading-overlay-query" id="search-job-query" hidden></p>
+
+    <div class="search-loading-overlay-status" id="search-job-status" data-status="queued">
+      <span class="search-loading-overlay-status-label">Status</span>
+      <span class="search-loading-overlay-status-value" id="search-job-status-value">Queued</span>
+    </div>
+
+    <p class="search-loading-overlay-text" id="search-job-subtitle">Preparing your investigation…</p>
+    <p class="search-loading-overlay-estimate" id="search-job-estimate" hidden>
+      Complex searches can take up to 2 minutes or more.
+    </p>
+
+    <div class="search-loading-overlay-error" id="search-job-error" hidden role="alert">
+      <p class="search-loading-overlay-error-text" id="search-job-error-message"></p>
+      <div class="search-loading-overlay-error-actions">
+        <button type="button" class="search-loading-overlay-btn" id="search-job-retry">Try again</button>
+        <button type="button" class="search-loading-overlay-btn search-loading-overlay-btn--ghost" id="search-job-copy-error">Copy error</button>
+      </div>
+    </div>
+
+    <div class="search-social-crawl" id="search-social-crawl" aria-hidden="true">
+      <div class="search-social-crawl-rows">
+        <div class="search-social-crawl-row">
+          <span class="search-social-host" id="search-social-host-a">gov.ph</span>
+          <span class="search-social-phase" id="search-social-phase-a">indexed</span>
+        </div>
+        <div class="search-social-crawl-row">
+          <span class="search-social-host" id="search-social-host-b">facebook.com</span>
+          <span class="search-social-phase" id="search-social-phase-b">matching</span>
+        </div>
+        <div class="search-social-crawl-row">
+          <span class="search-social-host" id="search-social-host-c">instagram.com</span>
+          <span class="search-social-phase" id="search-social-phase-c">linking</span>
+        </div>
+      </div>
+      <div class="search-crawl-progress" id="search-crawl-progress" data-progress-mode="indeterminate">
+        <span class="search-crawl-progress-bar" id="search-crawl-progress-bar"></span>
+      </div>
+    </div>
+
+    <p class="search-loading-overlay-footnote" id="search-job-footnote">Press Esc to cancel</p>
+  </div>
+</div>
