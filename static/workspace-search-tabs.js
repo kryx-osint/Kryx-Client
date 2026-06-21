@@ -18,7 +18,6 @@
     plate_number: "Enter a plate number.",
     passport_number: "Enter a passport number.",
   };
-  var LAST_SEARCH_KEY = "kryx-last-search";
   var SUCCESS_REDIRECT_MS = 450;
   var ESTIMATE_DELAY_MS = 5000;
 
@@ -101,8 +100,6 @@
   var panels = root.querySelectorAll("[data-search-panel]");
   var hints = root.querySelectorAll("[data-hint]");
   var inlineError = document.getElementById("search-inline-error");
-  var lastSearchWrap = document.getElementById("search-last-query");
-  var lastSearchBtn = document.getElementById("search-last-query-btn");
 
   function activePanel() {
     var i;
@@ -215,6 +212,14 @@
       showInlineError("Accept the Terms and Privacy Policy before searching.");
       return false;
     }
+    if (form.getAttribute("data-search-captcha-required") === "true") {
+      var captchaInput = document.getElementById("search-captcha");
+      if (captchaInput && !(captchaInput.value || "").trim()) {
+        showInlineError("Enter the security code shown in the image.");
+        if (captchaInput.focus) captchaInput.focus();
+        return false;
+      }
+    }
     return true;
   }
 
@@ -248,65 +253,28 @@
     return label + " · " + redactValue(getRawQueryValue(searchType), searchType);
   }
 
-  function saveLastSearch() {
-    try {
-      var searchType = (hiddenType && hiddenType.value) || "username";
-      sessionStorage.setItem(
-        LAST_SEARCH_KEY,
-        JSON.stringify({
-          type: searchType,
-          value: getRawQueryValue(searchType),
-        })
-      );
-    } catch (err) {
-      /* ignore */
-    }
+  var captchaTokenInput = form.querySelector('input[name="captcha_token"]');
+  var captchaInputEl = document.getElementById("search-captcha");
+  var captchaImg = document.getElementById("search-captcha-img");
+  var captchaRefresh = document.getElementById("search-captcha-refresh");
+  var captchaBasePath = "/app/captcha";
+
+  function applyCaptchaToken(token) {
+    if (!token) return;
+    if (captchaTokenInput) captchaTokenInput.value = token;
+    var baseUrl = captchaBasePath + "?token=" + encodeURIComponent(token);
+    if (captchaRefresh) captchaRefresh.setAttribute("data-captcha-url", baseUrl);
+    if (captchaImg) captchaImg.src = baseUrl + "&t=" + Date.now();
   }
 
-  function restoreLastSearchUi() {
-    if (!lastSearchWrap || !lastSearchBtn) return;
-    try {
-      var raw = sessionStorage.getItem(LAST_SEARCH_KEY);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      if (!saved || VALID.indexOf(saved.type) < 0 || !(saved.value || "").trim()) return;
-      lastSearchWrap.hidden = false;
-      lastSearchBtn.textContent =
-        "Repeat · " + TYPE_LABELS[saved.type] + " · " + redactValue(saved.value, saved.type);
-      lastSearchBtn.onclick = function () {
-        setTab(saved.type, false);
-        if (saved.type === "name") {
-          var parts = (saved.value || "").trim().split(/\s+/);
-          var firstEl = document.getElementById("search-first-name");
-          var lastEl = document.getElementById("search-last-name");
-          if (firstEl) firstEl.value = parts.shift() || "";
-          if (lastEl) lastEl.value = parts.join(" ") || "";
-        } else {
-          var fieldMap = {
-            username: "search-username",
-            phone: "search-phone",
-            email: "search-email",
-            plate_number: "search-plate-number",
-            passport_number: "search-passport-number",
-          };
-          var input = document.getElementById(fieldMap[saved.type] || "");
-          if (input) input.value = saved.value || "";
-        }
-        clearInlineError();
-        form.requestSubmit();
-      };
-    } catch (err) {
-      /* ignore */
-    }
+  function rotateCaptchaFromResponse(data) {
+    if (data && data.captcha_token) applyCaptchaToken(data.captcha_token);
+    if (captchaInputEl) captchaInputEl.value = "";
   }
 
-  restoreLastSearchUi();
-
-  var img = document.getElementById("search-captcha-img");
-  var refresh = document.getElementById("search-captcha-refresh");
-  if (img && refresh) {
-    refresh.addEventListener("click", function () {
-      img.src = refresh.getAttribute("data-captcha-url") + "?t=" + Date.now();
+  if (captchaImg && captchaRefresh) {
+    captchaRefresh.addEventListener("click", function () {
+      captchaImg.src = captchaRefresh.getAttribute("data-captcha-url") + "&t=" + Date.now();
     });
   }
 
@@ -331,6 +299,8 @@
   var errorMessageEl = document.getElementById("search-job-error-message");
   var retryBtn = document.getElementById("search-job-retry");
   var copyErrorBtn = document.getElementById("search-job-copy-error");
+  var cancelBtn = document.getElementById("search-job-cancel");
+  var cancelActions = document.getElementById("search-job-actions");
   var stepsEl = document.getElementById("search-job-steps");
   var socialCrawl = document.getElementById("search-social-crawl");
   var lastErrorMessage = "";
@@ -338,10 +308,47 @@
   var lastHosts = ["", "", ""];
   var socialTickTimer = null;
   var estimateTimer = null;
-  var isLocked = false;
+  var searchInProgress = false;
   var osintDispose = null;
   var escapeHandler = null;
   var clickHandler = null;
+  var pollTimer = null;
+  var searchCancelled = false;
+
+  function clearPollTimer() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function removeLockListeners() {
+    if (escapeHandler) {
+      document.removeEventListener("keydown", escapeHandler, true);
+      escapeHandler = null;
+    }
+    if (clickHandler) {
+      document.removeEventListener("click", clickHandler, true);
+      clickHandler = null;
+    }
+  }
+
+  function overlayIsOpen() {
+    return Boolean(overlay && !overlay.hidden);
+  }
+
+  function requestCancelSearch() {
+    if (!overlayIsOpen()) return;
+    if (searchInProgress) {
+      if (window.confirm("Leave search in progress? You may need to run the query again.")) {
+        searchCancelled = true;
+        clearPollTimer();
+        unlockSearchUi();
+      }
+      return;
+    }
+    unlockSearchUi();
+  }
 
   function pollJobUrl(jobId) {
     var base = (form.getAttribute("data-search-jobs-url") || "/app/search/jobs").replace(/\/$/, "");
@@ -493,20 +500,15 @@
 
   function showSearchError(message) {
     lastErrorMessage = message || "Search failed.";
+    searchInProgress = false;
+    clearPollTimer();
     setJobStatus("failed");
     if (errorWrap) errorWrap.hidden = false;
     if (errorMessageEl) errorMessageEl.textContent = lastErrorMessage;
     if (socialCrawl) socialCrawl.hidden = true;
+    if (cancelActions) cancelActions.hidden = false;
+    if (cancelBtn) cancelBtn.textContent = "Close";
     if (overlay) overlay.setAttribute("aria-busy", "false");
-    isLocked = false;
-    if (escapeHandler) {
-      document.removeEventListener("keydown", escapeHandler, true);
-      escapeHandler = null;
-    }
-    if (clickHandler) {
-      document.removeEventListener("click", clickHandler, true);
-      clickHandler = null;
-    }
   }
 
   function resetSearchPanelUi() {
@@ -533,6 +535,7 @@
     if (document.body) document.body.classList.remove("search-page--loading");
     clearSocialTick();
     clearEstimateTimer();
+    clearPollTimer();
     if (estimateEl) estimateEl.hidden = true;
     hideSearchError();
     if (typeof osintDispose === "function") {
@@ -542,25 +545,25 @@
   }
 
   function unlockSearchUi() {
-    isLocked = false;
+    searchInProgress = false;
+    searchCancelled = false;
+    removeLockListeners();
     resetSearchPanelUi();
+    if (cancelBtn) cancelBtn.textContent = "Cancel search";
   }
 
   function lockInteractions() {
-    if (isLocked) return;
-    isLocked = true;
+    removeLockListeners();
     escapeHandler = function (event) {
-      if (!isLocked) return;
+      if (!overlayIsOpen()) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        if (window.confirm("Leave search in progress? You may need to run the query again.")) {
-          unlockSearchUi();
-        }
+        requestCancelSearch();
       }
     };
     clickHandler = function (event) {
-      if (!isLocked) return;
+      if (!overlayIsOpen()) return;
       var card = document.getElementById("search-loading-overlay-card");
       if (card && card.contains(event.target)) return;
       event.preventDefault();
@@ -571,8 +574,11 @@
   }
 
   function beginSearchOverlay() {
+    searchCancelled = false;
+    searchInProgress = true;
     hideSearchError();
-    saveLastSearch();
+    if (cancelActions) cancelActions.hidden = false;
+    if (cancelBtn) cancelBtn.textContent = "Cancel search";
     if (queryEl) {
       queryEl.textContent = getQuerySummary();
       queryEl.hidden = false;
@@ -612,6 +618,7 @@
   function pollSearchJob(jobId) {
     var pollMs = 1500;
     function tick() {
+      if (searchCancelled) return;
       fetch(pollJobUrl(jobId), {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
@@ -622,6 +629,7 @@
           });
         })
         .then(function (result) {
+          if (searchCancelled) return;
           if (!result.ok || !result.body || !result.body.ok) {
             throw new Error((result.body && result.body.error) || "Could not read search status.");
           }
@@ -636,30 +644,43 @@
           if (data.status === "failed") {
             throw new Error(data.error || "Search failed.");
           }
-          setTimeout(tick, pollMs);
+          pollTimer = setTimeout(tick, pollMs);
         })
         .catch(function (err) {
+          if (searchCancelled) return;
           showSearchError(err.message || "Search failed.");
         });
     }
     tick();
   }
 
-  function startAsyncSearch() {
-    var jobsUrl = form.getAttribute("data-search-jobs-url");
-    if (!jobsUrl || typeof window.fetch !== "function") {
-      beginSearchOverlay();
-      setJobStatus("running");
-      return;
-    }
+  function setSubmitBusy(busy) {
+    var panel = activePanel();
+    if (!panel) return;
+    var barSubmit = panel.querySelector(".landing-preview-bar-submit");
+    if (!barSubmit) return;
+    barSubmit.disabled = !!busy;
+    barSubmit.classList.toggle("is-submitting", !!busy);
+    barSubmit.setAttribute("aria-busy", busy ? "true" : "false");
+    var spinner = barSubmit.querySelector(".landing-preview-bar-submit-spinner");
+    var icon = barSubmit.querySelector(".landing-preview-bar-submit-icon");
+    if (spinner) spinner.hidden = !busy;
+    if (icon) icon.hidden = !!busy;
+  }
 
-    beginSearchOverlay();
-    setJobStatus("queued");
+  function validateCaptchaBeforeSearch() {
+    var validateUrl = form.getAttribute("data-search-captcha-url");
+    if (form.getAttribute("data-search-captcha-required") !== "true" || !validateUrl) {
+      return Promise.resolve(true);
+    }
+    if (typeof window.fetch !== "function") {
+      return Promise.resolve(true);
+    }
 
     var formData = new FormData(form);
     var csrfToken = formData.get("csrf_token") || "";
 
-    fetch(jobsUrl, {
+    return fetch(validateUrl, {
       method: "POST",
       body: formData,
       credentials: "same-origin",
@@ -674,20 +695,82 @@
         });
       })
       .then(function (result) {
-        if (!result.ok || !result.body || !result.body.ok || !result.body.job_id) {
-          throw new Error((result.body && result.body.error) || "Search could not start.");
+        if (result.ok && result.body && result.body.ok) {
+          return true;
         }
-        setJobStatus(result.body.status || "queued");
-        pollSearchJob(result.body.job_id);
+        rotateCaptchaFromResponse(result.body || {});
+        showInlineError((result.body && result.body.error) || "Security code did not match.");
+        if (captchaInputEl && captchaInputEl.focus) captchaInputEl.focus();
+        return false;
       })
-      .catch(function (err) {
-        showSearchError(err.message || "Search could not start.");
+      .catch(function () {
+        showInlineError("Could not verify the security code. Try again.");
+        return false;
+      });
+  }
+
+  function startAsyncSearch() {
+    var jobsUrl = form.getAttribute("data-search-jobs-url");
+    if (!jobsUrl || typeof window.fetch !== "function") {
+      beginSearchOverlay();
+      setJobStatus("running");
+      return;
+    }
+
+    setSubmitBusy(true);
+    validateCaptchaBeforeSearch()
+      .then(function (captchaOk) {
+        setSubmitBusy(false);
+        if (!captchaOk) return;
+
+        beginSearchOverlay();
+        setJobStatus("queued");
+
+        var formData = new FormData(form);
+        var csrfToken = formData.get("csrf_token") || "";
+
+        fetch(jobsUrl, {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+        })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, body: body };
+            });
+          })
+          .then(function (result) {
+            if (!result.ok || !result.body || !result.body.ok || !result.body.job_id) {
+              var errMsg = (result.body && result.body.error) || "Search could not start.";
+              if (result.body && result.body.captcha_token) {
+                rotateCaptchaFromResponse(result.body);
+              } else if (/security code/i.test(errMsg)) {
+                rotateCaptchaFromResponse({});
+              }
+              throw new Error(errMsg);
+            }
+            setJobStatus(result.body.status || "queued");
+            pollSearchJob(result.body.job_id);
+          })
+          .catch(function (err) {
+            showSearchError(err.message || "Search could not start.");
+          });
       });
   }
 
   if (retryBtn) {
     retryBtn.addEventListener("click", function () {
       unlockSearchUi();
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", function () {
+      requestCancelSearch();
     });
   }
 
