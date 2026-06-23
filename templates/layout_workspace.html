@@ -15,27 +15,20 @@
       >
         <span></span><span></span><span></span>
       </button>
-      <a href="{{ url_for('dashboard' if is_owner else 'search') }}" class="workspace-mobile-topbar-logo">
+      <a href="{{ url_for('dashboard' if is_owner else ('team_dashboard' if client_can_dashboard else ('logs' if client_team_role == 'auditor' else 'search'))) }}" class="workspace-mobile-topbar-logo">
         <img src="{{ client_logo_url }}" alt="" width="24" height="24" />
         <span class="workspace-mobile-topbar-logo-text client-org-brand" title="{{ client_org_name }}">{{ client_org_name }}</span>
       </a>
     </header>
     <div class="client-main workspace-client-main">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-      <div class="login-flash-stack client-flash-stack" role="alert">
-        {% for category, message in messages %}
-        <p class="login-flash login-flash--{{ category }}">{{ message }}</p>
-        {% endfor %}
-      </div>
-      {% endif %}
-      {% endwith %}
       {% block page %}{% endblock %}
     </div>
   </div>
+  {% include "partials/flash_toasts.html" %}
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='workspace-sidebar-mobile.js') }}" defer></script>
+<script src="{{ url_for('static', filename='client-toasts.js') }}" defer></script>
 {{ super() }}
 {% endblock %}

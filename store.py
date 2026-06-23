@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("KRYX_CLIENT_DATA_DIR", str(ROOT / "data"))).expanduser().resolve()
 STORE_FILE = DATA_DIR / "client_store.json"
 LOCK = FileLock(str(DATA_DIR / ".client_store.lock"), timeout=35)
+CLIENT_STORE_WARN_BYTES = 5 * 1024 * 1024
+CLIENT_STORE_CRITICAL_BYTES = 15 * 1024 * 1024
+REPORT_CONTEXT_MAX = 50
 
 
 def _default_store() -> Dict[str, Any]:
@@ -138,9 +141,38 @@ def save_search_context(store: Dict[str, Any], token: str, payload: Dict[str, An
     """Persist report payload on disk; session only holds the token (results exceed cookie size)."""
     contexts = store.setdefault("search_contexts", {})
     contexts[(token or "").strip()] = payload
-    if len(contexts) > 50:
-        for key in list(contexts.keys())[:-50]:
+    if len(contexts) > REPORT_CONTEXT_MAX:
+        for key in list(contexts.keys())[:-REPORT_CONTEXT_MAX]:
             del contexts[key]
+
+
+def _format_data_size(num_bytes: int) -> str:
+    if num_bytes < 1024:
+        return f"{num_bytes} B"
+    if num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    return f"{num_bytes / (1024 * 1024):.2f} MB"
+
+
+def client_store_snapshot(store: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    store_bytes = STORE_FILE.stat().st_size if STORE_FILE.is_file() else 0
+    if store_bytes >= CLIENT_STORE_CRITICAL_BYTES:
+        level = "critical"
+    elif store_bytes >= CLIENT_STORE_WARN_BYTES:
+        level = "warn"
+    else:
+        level = "ok"
+    contexts = (store or {}).get("search_contexts") if isinstance(store, dict) else {}
+    context_count = len(contexts) if isinstance(contexts, dict) else 0
+    return {
+        "level": level,
+        "store_bytes": store_bytes,
+        "store_size_label": _format_data_size(store_bytes),
+        "warn_threshold_label": _format_data_size(CLIENT_STORE_WARN_BYTES),
+        "critical_threshold_label": _format_data_size(CLIENT_STORE_CRITICAL_BYTES),
+        "report_context_count": context_count,
+        "report_context_max": REPORT_CONTEXT_MAX,
+    }
 
 
 def get_search_context(store: Dict[str, Any], token: str) -> Optional[Dict[str, Any]]:

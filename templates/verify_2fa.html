@@ -1,0 +1,17 @@
+{% extends "layout_auth.html" %}
+{% block title %}Verify sign-in — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-auth-panel">
+  <h1 class="text-2xl font-bold mb-2">Two-factor verification</h1>
+  <p class="text-sm text-muted-foreground mb-6">Enter a code from your authenticator app or a recovery code for <strong>{{ actor }}</strong>.</p>
+  <form method="post" class="login-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label class="login-field">
+      <span class="login-label">Authenticator or recovery code</span>
+      <input class="login-input" type="text" name="totp_code" inputmode="numeric" autocomplete="one-time-code" required autofocus />
+    </label>
+    <button type="submit" class="btn-primary w-full">Continue</button>
+  </form>
+  <p class="login-disclaimer mt-4"><a href="{{ url_for('login') }}" class="link-animated link-animated-cyan">Back to sign in</a></p>
+</section>
+{% endblock %}

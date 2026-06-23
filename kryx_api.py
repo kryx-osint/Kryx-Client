@@ -184,3 +184,32 @@ def search(
         raise KryxApiError("Unexpected search response", payload=data)
     credits = int(data.get("credits_remaining") or 0)
     return data, credits
+
+
+def fetch_search_health(base_url: str, *, timeout: int = 8) -> Dict[str, Any]:
+    """Proxy main Kryx search-server health (public endpoint on Kryx)."""
+    url = f"{base_url.rstrip('/')}/api/search-servers-health"
+    try:
+        resp = requests.get(url, timeout=timeout)
+        data = resp.json()
+        if isinstance(data, dict):
+            servers = data.get("servers") or []
+            live = sum(1 for s in servers if (s.get("status") or "") == "live")
+            return {
+                "ok": resp.ok,
+                "reachable": True,
+                "servers": servers,
+                "live_count": live,
+                "total_count": len(servers),
+                "degraded": bool(servers) and live < len(servers),
+            }
+    except requests.RequestException:
+        pass
+    return {
+        "ok": False,
+        "reachable": False,
+        "servers": [],
+        "live_count": 0,
+        "total_count": 0,
+        "degraded": True,
+    }

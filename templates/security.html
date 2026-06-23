@@ -1,0 +1,60 @@
+{% extends "layout_workspace.html" %}
+{% block title %}Security — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-page-shell admin-shell max-w-3xl">
+  <header class="admin-head mb-6">
+    <h1 class="text-2xl font-bold">Security</h1>
+    <p class="text-sm text-muted-foreground mt-2">Protect your workspace sign-in with two-factor authentication and session control.</p>
+  </header>
+
+  <a href="{{ url_for('security_sessions') }}" class="client-security-card-link admin-panel admin-panel--raised mb-4">
+    <div>
+      <h2 class="text-lg font-semibold">Active sessions</h2>
+      <p class="text-sm text-muted-foreground">{{ security_active_sessions }} device{{ 's' if security_active_sessions != 1 else '' }} signed in</p>
+    </div>
+    <span class="text-cyan-400 text-sm">Manage →</span>
+  </a>
+
+  <article class="admin-panel admin-panel--raised mb-4">
+    <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <h2 class="text-lg font-semibold">Two-factor authentication</h2>
+      {% if security_totp_enabled %}<span class="client-team-badge client-team-badge--active">Enabled</span>{% else %}<span class="client-team-badge client-team-badge--inactive">Disabled</span>{% endif %}
+    </div>
+
+    {% if security_recovery_plain %}
+    <div class="login-flash login-flash--info mb-4">
+      <p class="font-semibold mb-2">Save these recovery codes now:</p>
+      <ul class="font-mono text-sm">{% for code in security_recovery_plain %}<li>{{ code }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {% if security_totp_enabled %}
+    <p class="text-sm text-muted-foreground mb-4">Your account requires an authenticator code when signing in.</p>
+    <form method="post" class="admin-form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="form_action" value="reset_totp" />
+      <label class="login-field"><span class="login-label">Current password</span><input class="login-input" type="password" name="current_password" required /></label>
+      <label class="login-field"><span class="login-label">Authenticator or recovery code</span><input class="login-input" type="text" name="totp_code" required /></label>
+      <button type="submit" class="btn-secondary-outline">Reset 2FA</button>
+    </form>
+    {% elif security_setup_pending %}
+    <p class="text-sm text-muted-foreground mb-4">Scan this QR code, then enter the 6-digit code.</p>
+    {% if security_totp_qr_url %}<img src="{{ security_totp_qr_url }}" alt="Authenticator QR" width="180" height="180" class="mb-4" />{% endif %}
+    <form method="post" class="admin-form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="form_action" value="confirm_totp_setup" />
+      <label class="login-field"><span class="login-label">Authenticator code</span><input class="login-input" type="text" name="verify_code" inputmode="numeric" required /></label>
+      <button type="submit" class="btn-primary">Enable 2FA</button>
+    </form>
+    {% else %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="form_action" value="start_totp_setup" />
+      <button type="submit" class="btn-primary">Set up authenticator app</button>
+    </form>
+    {% endif %}
+  </article>
+
+  <p class="text-sm text-muted-foreground"><a href="{{ url_for('change_password') }}" class="link-animated link-animated-cyan">Change password</a></p>
+</section>
+{% endblock %}

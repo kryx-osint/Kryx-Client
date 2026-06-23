@@ -1,0 +1,138 @@
+{% extends "layout_workspace.html" %}
+{% block title %}My dashboard — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-page-shell workspace-dashboard-shell">
+  <h1 class="workspace-dashboard-title">My dashboard</h1>
+  <p class="workspace-billing-page-subtitle mb-4">Your investigation activity on the shared Kryx account.</p>
+
+  {% if account and account.credits is defined and account.credits <= 5 %}
+  <div class="client-alert-banner client-alert-banner--warn" role="alert">
+    <p class="client-alert-banner-title">Shared credits are low ({{ account.credits }} remaining)</p>
+    <p class="client-alert-banner-text">Inform the workspace owner before searches are blocked.</p>
+  </div>
+  {% endif %}
+
+  {% if attention_flags %}
+  <section class="client-attention-section mb-4" aria-label="Needs attention">
+    <h2 class="workspace-dashboard-usage-title">Needs attention</h2>
+    <div class="client-attention-list">
+      {% for flag in attention_flags %}
+      <div class="client-attention-flag client-attention-flag--{{ flag.level }}">
+        <span class="client-attention-flag-title">{{ flag.title }}</span>
+        <span class="client-attention-flag-detail">{{ flag.detail }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <nav class="client-dashboard-actions mb-4" aria-label="Quick actions">
+    {% if client_can_search %}<a href="{{ url_for('search') }}" class="client-dashboard-action client-dashboard-action--primary">New search</a>{% endif %}
+    {% if client_can_logs %}<a href="{{ url_for('logs') }}" class="client-dashboard-action">My logs</a>{% endif %}
+    <a href="{{ url_for('security') }}" class="client-dashboard-action">Security</a>
+  </nav>
+
+  <section class="client-jobs-section mb-4" id="client-dashboard-jobs" {% if not active_jobs %}hidden{% endif %}>
+    <h2 class="workspace-dashboard-usage-title">Your search jobs</h2>
+    <ul class="client-jobs-list" id="client-dashboard-jobs-list">
+      {% for job in active_jobs %}
+      <li class="client-job-item">
+        <span class="client-job-status client-job-status--{{ job.status }}">{{ job.status }}</span>
+        <span>{{ job.search_type|replace('_', ' ')|title }} · {{ job.age_label }}</span>
+        <a href="{{ url_for('search', type=job.search_type) }}" class="link-animated link-animated-cyan text-sm">Open search</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <div class="client-stat-grid client-dashboard-stat-cards mb-6">
+    <article class="admin-stat-card admin-stat-card--searches">
+      <p class="admin-stat-card-label">Your searches (30d)</p>
+      <p class="admin-stat-card-value" id="team-stat-searches-30d">{{ usage.searches_30d }}</p>
+    </article>
+    <article class="admin-stat-card admin-stat-card--searches">
+      <p class="admin-stat-card-label">Your searches (all time)</p>
+      <p class="admin-stat-card-value">{{ usage.searches_all }}</p>
+    </article>
+    <article class="admin-stat-card admin-stat-card--credits">
+      <p class="admin-stat-card-label">Shared wallet</p>
+      <p class="admin-stat-card-value" id="team-stat-credits">{{ usage.shared_credits if account else '—' }}</p>
+    </article>
+    <article class="admin-stat-card admin-stat-card--api">
+      <p class="admin-stat-card-label">Shared period usage</p>
+      <p class="admin-stat-card-value admin-stat-card-value--small" id="team-stat-period">
+        {% if usage.monthly_limit %}{{ usage.monthly_used }} / {{ usage.monthly_limit }}{% else %}—{% endif %}
+      </p>
+    </article>
+  </div>
+
+  {% if account %}
+  <section class="workspace-dashboard-usage mb-6" aria-labelledby="team-usage-heading">
+    <h2 id="team-usage-heading" class="workspace-dashboard-usage-title">Your usage</h2>
+    <div class="client-chart-grid workspace-dashboard-usage-grid">
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Shared credits</p>
+        <p class="workspace-dashboard-chart-sub">Kryx account wallet &amp; period cap</p>
+        <div class="workspace-dashboard-chart-canvas-wrap workspace-dashboard-chart-canvas-wrap--doughnut">
+          <canvas id="chart-credits"></canvas>
+        </div>
+      </article>
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Your searches per day</p>
+        <p class="workspace-dashboard-chart-sub">Last 30 days</p>
+        <div class="workspace-dashboard-chart-canvas-wrap">
+          <canvas id="chart-daily"></canvas>
+        </div>
+      </article>
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">Your searches per month</p>
+        <div class="workspace-dashboard-chart-canvas-wrap">
+          <canvas id="chart-monthly"></canvas>
+        </div>
+      </article>
+      {% if charts.has_type_data %}
+      <article class="workspace-dashboard-chart-card">
+        <p class="workspace-dashboard-chart-title">By search type</p>
+        <div class="workspace-dashboard-chart-canvas-wrap workspace-dashboard-chart-canvas-wrap--doughnut">
+          <canvas id="chart-types"></canvas>
+        </div>
+      </article>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if recent_searches %}
+  <br>
+  <article class="admin-panel admin-panel--raised mb-6">
+    <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <h2 class="text-lg font-semibold">Recent searches</h2>
+      <button type="button" class="client-reveal-toggle" id="client-team-reveal-toggle" aria-pressed="false">Show query values</button>
+    </div>
+    <ul class="client-recent-list">
+      {% for row in recent_searches %}
+      <li class="client-recent-item">
+        <div>
+          <p class="text-xs text-muted-foreground">{{ row.search_type|replace('_', ' ')|title }}</p>
+          <p class="client-recent-value" data-masked="{{ row.display_value_masked }}" data-full="{{ row.display_value_full }}">{{ row.display_value_masked }}</p>
+        </div>
+        <div class="client-recent-actions">
+          <a href="{{ row.rerun_url }}" class="link-animated link-animated-cyan text-xs">Re-run</a>
+          <time class="text-xs text-muted-foreground">{{ row.created_at }}</time>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </article>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script id="client-dashboard-data" type="application/json">{{ charts | tojson }}</script>
+<script id="client-dashboard-live-config" type="application/json">{{ {"live_url": url_for("team_dashboard_api_live")} | tojson }}</script>
+<script src="{{ url_for('static', filename='client-dashboard.js') }}" defer></script>
+<script src="{{ url_for('static', filename='client-dashboard-live.js') }}" defer></script>
+<script src="{{ url_for('static', filename='client-privacy-toggle.js') }}" defer></script>
+{% endblock %}

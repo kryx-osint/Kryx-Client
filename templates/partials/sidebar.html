@@ -1,72 +1,183 @@
 <button
+
   type="button"
+
   class="workspace-sidebar-backdrop"
+
   id="workspace-sidebar-backdrop"
+
   aria-label="Close workspace menu"
+
   hidden
+
 ></button>
+
 <aside class="workspace-sidebar" id="workspace-sidebar-panel" aria-label="Client navigation">
+
   <div class="workspace-sidebar-brand">
-    <a href="{{ url_for('dashboard' if is_owner else 'search') }}" class="workspace-sidebar-logo">
+
+    <a href="{{ url_for('dashboard' if is_owner else ('team_dashboard' if client_can_dashboard else ('logs' if client_team_role == 'auditor' else 'search'))) }}" class="workspace-sidebar-logo">
+
       <img src="{{ client_logo_url }}" alt="" width="28" height="28" />
+
       <span class="workspace-sidebar-logo-text client-org-brand" title="{{ client_org_name }}">{{ client_org_name }}</span>
+
     </a>
+
   </div>
+
+
 
   <nav class="workspace-sidebar-nav">
+
     {% if is_owner %}
+
     <a href="{{ url_for('dashboard') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'dashboard' %} workspace-sidebar-link--active{% endif %}">
+
       <span class="workspace-sidebar-icon" aria-hidden="true">
+
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+
       </span>
+
       <span class="workspace-sidebar-label">Dashboard</span>
+
     </a>
+
+    {% elif client_can_dashboard %}
+
+    <a href="{{ url_for('team_dashboard') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'team_dashboard' %} workspace-sidebar-link--active{% endif %}">
+
+      <span class="workspace-sidebar-icon" aria-hidden="true">
+
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+
+      </span>
+
+      <span class="workspace-sidebar-label">My dashboard</span>
+
+    </a>
+
     {% endif %}
+
+
+
+    {% if client_can_search %}
 
     <p class="workspace-sidebar-section">Investigate</p>
+
     <a href="{{ url_for('search') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'search' %} workspace-sidebar-link--active{% endif %}">
+
       <span class="workspace-sidebar-icon" aria-hidden="true">
+
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+
       </span>
+
       <span class="workspace-sidebar-label">Search</span>
+
     </a>
+
+    {% endif %}
+
+
+
+    {% if client_can_logs %}
+
+    <p class="workspace-sidebar-section">{% if is_owner %}Manage{% else %}Activity{% endif %}</p>
+
+    <a href="{{ url_for('logs') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'logs' %} workspace-sidebar-link--active{% endif %}">
+
+      <span class="workspace-sidebar-icon" aria-hidden="true">
+
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+
+      </span>
+
+      <span class="workspace-sidebar-label">Logs</span>
+
+    </a>
+
+    {% endif %}
+
+
 
     {% if is_owner %}
-    <p class="workspace-sidebar-section">Manage</p>
+
     <a href="{{ url_for('team') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'team' %} workspace-sidebar-link--active{% endif %}">
+
       <span class="workspace-sidebar-icon" aria-hidden="true">
+
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+
       </span>
+
       <span class="workspace-sidebar-label">Team</span>
+
     </a>
-    <a href="{{ url_for('logs') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'logs' %} workspace-sidebar-link--active{% endif %}">
-      <span class="workspace-sidebar-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
-      </span>
-      <span class="workspace-sidebar-label">Logs</span>
-    </a>
+
     <a href="{{ url_for('settings') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint == 'settings' %} workspace-sidebar-link--active{% endif %}">
+
       <span class="workspace-sidebar-icon" aria-hidden="true">
+
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+
       </span>
+
       <span class="workspace-sidebar-label">Settings</span>
+
     </a>
+
     {% endif %}
+
+
+
+    <a href="{{ url_for('security') }}" class="workspace-sidebar-link{% if workspace_nav_endpoint in ('security', 'security_sessions', 'change_password') %} workspace-sidebar-link--active{% endif %}">
+
+      <span class="workspace-sidebar-icon" aria-hidden="true">
+
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+
+      </span>
+
+      <span class="workspace-sidebar-label">Security</span>
+
+    </a>
+
   </nav>
 
+
+
   <div class="workspace-sidebar-footer">
+
     <div class="workspace-sidebar-user">
+
       <span class="workspace-sidebar-user-avatar" aria-hidden="true">{{ actor_initials }}</span>
-      <span class="workspace-sidebar-user-email" title="{{ actor }}">{{ actor }}</span>
+
+      <span class="workspace-sidebar-user-email" title="{{ actor }}">{{ actor }}{% if client_team_role and not is_owner %} · {{ client_team_role }}{% endif %}</span>
+
     </div>
+
     <a href="{{ url_for('logout') }}" class="workspace-sidebar-logout">
+
       <span class="workspace-sidebar-icon" aria-hidden="true">
+
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+
           <path d="M16 17l5-5-5-5M21 12H9" />
+
         </svg>
+
       </span>
+
       <span class="workspace-sidebar-label">Sign out</span>
+
     </a>
+
   </div>
+
 </aside>
+
+

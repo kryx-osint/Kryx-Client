@@ -6,6 +6,7 @@ import csv
 import io
 import mimetypes
 import os
+import re
 import secrets
 import threading
 import time
@@ -14,6 +15,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+from urllib.parse import quote
 
 from werkzeug.utils import secure_filename
 
@@ -38,14 +40,32 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import client_ops
+import client_security
 import kryx_api
 import system_stats
 import user_intel
+from client_ops import (
+    DEFAULT_TEAM_ROLE,
+    active_jobs_snapshot,
+    attention_flags,
+    actor_usage_charts,
+    actor_usage_stats,
+    client_ip_from_request,
+    clear_login_failures,
+    login_rate_blocked,
+    mask_search_display_value,
+    normalize_team_role,
+    recent_search_rows,
+    record_login_failure,
+)
 from kryx_api import KryxApiError
 from store import (
     DATA_DIR,
+    REPORT_CONTEXT_MAX,
     append_audit,
     append_search_log,
+    client_store_snapshot,
     get_search_context,
     load_store,
     new_id,
@@ -71,6 +91,20 @@ SESSION_ACTOR = "client_actor"
 SESSION_CSRF = "csrf_token"
 SESSION_SEARCH_OK = "client_search_ok"
 SESSION_SEARCH_TOKEN = "client_search_token"
+SESSION_AUTH_SESSION_ID = "client_auth_session_id"
+SESSION_AUTH_EPOCH = "client_auth_epoch"
+SESSION_PENDING_2FA_ACTOR = "client_pending_2fa_actor"
+SESSION_PENDING_2FA_AT = "client_pending_2fa_at"
+SESSION_TOTP_SETUP_SECRET = "client_totp_setup_secret"
+SESSION_RECOVERY_PLAIN = "client_recovery_plain"
+SESSION_MUST_CHANGE_PASSWORD = "client_must_change_password"
+
+PENDING_2FA_TTL_SEC = 300
+SECURITY_PEPPER = (
+    os.environ.get("KRYX_CLIENT_SECURITY_PEPPER")
+    or os.environ.get("KRYX_CLIENT_SECRET_KEY")
+    or "change-kryx-client-secret-in-production"
+)
 
 SEARCH_TYPES = {
     "username": {"label": "Username", "field": "username", "placeholder": "username"},
@@ -441,6 +475,216 @@ def _is_owner() -> bool:
     return session.get(SESSION_ROLE) == "owner"
 
 
+def _client_ip() -> str:
+    return client_ip_from_request(request)
+
+
+def _actor_member(store: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if _is_owner():
+        return None
+    return team_by_username(store, _actor_label())
+
+
+def _actor_team_role(store: Dict[str, Any]) -> str:
+    if _is_owner():
+        return "owner"
+    member = _actor_member(store)
+    if not member:
+        return DEFAULT_TEAM_ROLE
+    return normalize_team_role(member.get("role"))
+
+
+def _actor_search_enabled(store: Dict[str, Any]) -> bool:
+    if _is_owner():
+        return True
+    member = _actor_member(store)
+    if not member or not member.get("active", True):
+        return False
+    if member.get("search_enabled", True) is False:
+        return False
+    if normalize_team_role(member.get("role")) == "auditor":
+        return False
+    return True
+
+
+def _actor_can_view_logs(store: Dict[str, Any]) -> bool:
+    if _is_owner():
+        return True
+    role = _actor_team_role(store)
+    return role in {"supervisor", "auditor"}
+
+
+def _actor_logs_scope(store: Dict[str, Any]) -> str:
+    if _is_owner():
+        return "all"
+    role = _actor_team_role(store)
+    if role == "supervisor":
+        return "own"
+    if role == "auditor":
+        return "all"
+    return "none"
+
+
+def _owner_security(store: Dict[str, Any]) -> Dict[str, Any]:
+    cfg = _config(store)
+    sec = cfg.setdefault("owner_security", {})
+    client_security.ensure_user_security(sec)
+    return sec
+
+
+def _actor_security_record(store: Dict[str, Any]) -> Dict[str, Any]:
+    if _is_owner():
+        return _owner_security(store)
+    member = _actor_member(store)
+    if member is not None:
+        client_security.ensure_user_security(member)
+        return member
+    return {}
+
+
+def _must_change_password() -> bool:
+    return bool(session.get(SESSION_MUST_CHANGE_PASSWORD))
+
+
+def _set_must_change_password(flag: bool) -> None:
+    if flag:
+        session[SESSION_MUST_CHANGE_PASSWORD] = "1"
+    else:
+        session.pop(SESSION_MUST_CHANGE_PASSWORD, None)
+
+
+def _clear_pending_2fa() -> None:
+    session.pop(SESSION_PENDING_2FA_ACTOR, None)
+    session.pop(SESSION_PENDING_2FA_AT, None)
+
+
+def _pending_2fa_actor() -> Optional[str]:
+    actor = (session.get(SESSION_PENDING_2FA_ACTOR) or "").strip()
+    if not actor:
+        return None
+    try:
+        started = float(session.get(SESSION_PENDING_2FA_AT) or 0)
+    except (TypeError, ValueError):
+        _clear_pending_2fa()
+        return None
+    if time.time() - started > PENDING_2FA_TTL_SEC:
+        _clear_pending_2fa()
+        return None
+    return actor
+
+
+def _security_record_for_actor(store: Dict[str, Any], actor: str, *, is_owner: bool) -> Dict[str, Any]:
+    if is_owner:
+        return _owner_security(store)
+    member = team_by_username(store, actor)
+    if member is None:
+        return {}
+    client_security.ensure_user_security(member)
+    return member
+
+
+def _complete_client_login(store: Dict[str, Any], actor: str, *, is_owner: bool) -> None:
+    sec = _security_record_for_actor(store, actor, is_owner=is_owner)
+    if not sec:
+        return
+    sid = secrets.token_urlsafe(18)
+    epoch = client_security.register_auth_session(
+        sec,
+        sid,
+        request.headers.get("User-Agent") or "",
+        _client_ip(),
+        _utc_now(),
+    )
+    if is_owner:
+        store["config"] = _config(store)
+    save_store(store)
+    session[SESSION_ROLE] = "owner" if is_owner else "team"
+    session[SESSION_ACTOR] = actor
+    session[SESSION_AUTH_SESSION_ID] = sid
+    session[SESSION_AUTH_EPOCH] = epoch
+    _set_must_change_password(False)
+
+
+def _session_valid(store: Dict[str, Any]) -> bool:
+    actor = _actor_label()
+    if not actor or actor == "unknown":
+        return False
+    sec = _actor_security_record(store)
+    if not sec:
+        return False
+    sid = (session.get(SESSION_AUTH_SESSION_ID) or "").strip()
+    epoch = session.get(SESSION_AUTH_EPOCH)
+    if client_security.auth_session_valid(sec, sid, epoch):
+        return True
+    stored_epoch = int(sec.get("auth_session_epoch", 0) or 0)
+    if sid and client_security.auth_session_active(sec, sid):
+        session[SESSION_AUTH_EPOCH] = stored_epoch
+        return True
+    if session.get(SESSION_ACTOR) and not sec.get("auth_sessions"):
+        sid = sid or secrets.token_urlsafe(18)
+        epoch = client_security.register_auth_session(
+            sec,
+            sid,
+            request.headers.get("User-Agent") or "",
+            _client_ip(),
+            _utc_now(),
+        )
+        if _is_owner():
+            store["config"] = _config(store)
+        save_store(store)
+        session[SESSION_AUTH_SESSION_ID] = sid
+        session[SESSION_AUTH_EPOCH] = epoch
+        return True
+    return False
+
+
+def _touch_session(store: Dict[str, Any]) -> None:
+    sec = _actor_security_record(store)
+    if sec:
+        client_security.touch_auth_session(
+            sec,
+            (session.get(SESSION_AUTH_SESSION_ID) or "").strip(),
+            _utc_now(),
+        )
+        save_store(store)
+
+
+def _actor_can_dashboard(store: Dict[str, Any]) -> bool:
+    if _is_owner():
+        return False
+    return _actor_team_role(store) in {"investigator", "supervisor"}
+
+
+def _home_endpoint_for_actor(store: Dict[str, Any]) -> str:
+    if _is_owner():
+        return "dashboard"
+    role = _actor_team_role(store)
+    if role == "auditor":
+        return "logs"
+    if role in {"investigator", "supervisor"}:
+        return "team_dashboard"
+    return "search"
+
+
+def _fetch_account_with_error(store: Dict[str, Any]) -> tuple[Optional[Dict[str, Any]], str]:
+    base, token = _kryx_credentials(store)
+    if not base or not token:
+        return None, "Kryx URL or API token is not configured."
+    try:
+        account = kryx_api.get_account_or_probe(base, token)
+        if account and account.get("account_endpoint_missing"):
+            last_credits = _config(store).get("last_known_credits")
+            if last_credits is not None:
+                account = dict(account)
+                account["credits"] = int(last_credits)
+        return account, ""
+    except KryxApiError as exc:
+        msg = str(exc)
+        if exc.code == "invalid_token":
+            msg += " Update the API token under Settings."
+        return None, msg
+
+
 def _require_login(f: Callable):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -457,6 +701,34 @@ def _require_owner(f: Callable):
     def wrapper(*args, **kwargs):
         if not _is_owner():
             flash("Owner access required.", "error")
+            return redirect(url_for(_home_endpoint_for_actor(load_store())))
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def _require_search(f: Callable):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        store = load_store()
+        if _must_change_password():
+            return redirect(url_for("change_password"))
+        if not _actor_search_enabled(store):
+            flash("Search is not available for your account.", "error")
+            return redirect(url_for(_home_endpoint_for_actor(store)))
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def _require_logs(f: Callable):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        store = load_store()
+        if _must_change_password():
+            return redirect(url_for("change_password"))
+        if not _actor_can_view_logs(store):
+            flash("You do not have access to logs.", "error")
             return redirect(url_for("search"))
         return f(*args, **kwargs)
 
@@ -471,13 +743,30 @@ def guard_setup_and_csrf():
     store = load_store()
     if not _setup_complete(store) and endpoint != "setup":
         return redirect(url_for("setup"))
-    if request.method == "POST" and endpoint not in {"setup", "login"}:
+    if request.method == "POST" and endpoint not in {"setup", "login", "verify_2fa"}:
         token = (request.form.get("csrf_token") or request.headers.get("X-CSRF-Token") or "").strip()
         if not _valid_csrf(token):
-            if endpoint in {"search_report_context_sync", "search_jobs_create"}:
+            if endpoint in {"search_report_context_sync", "search_jobs_create", "dashboard_api_live", "team_dashboard_api_live"}:
                 return jsonify({"ok": False, "error": "Security check failed."}), 403
             flash("Security check failed. Refresh and try again.", "error")
             return redirect(request.referrer or url_for("dashboard"))
+
+    if session.get(SESSION_ACTOR) and endpoint not in {
+        "setup",
+        "login",
+        "logout",
+        "verify_2fa",
+        "change_password",
+        "static",
+        "client_brand_logo",
+    }:
+        if not _session_valid(store):
+            session.clear()
+            flash("Your session was revoked or expired. Sign in again.", "error")
+            return redirect(url_for("login"))
+        _touch_session(store)
+        if _must_change_password() and endpoint not in {"change_password", "logout"}:
+            return redirect(url_for("change_password"))
 
 
 @app.context_processor
@@ -485,9 +774,11 @@ def inject_globals():
     endpoint = request.endpoint or ""
     actor = _actor_label()
     initials = (actor.replace(".", "").replace("_", "")[:2] or "U").upper()
-    show_workspace = bool(session.get(SESSION_ACTOR) and endpoint not in {"setup", "login"})
-    cfg = _config(load_store())
+    show_workspace = bool(session.get(SESSION_ACTOR) and endpoint not in {"setup", "login", "verify_2fa"})
+    store = load_store()
+    cfg = _config(store)
     org_name = (cfg.get("organization_name") or "My team").strip() or "My team"
+    team_role = _actor_team_role(store) if session.get(SESSION_ACTOR) else ""
     return {
         "csrf_token": _csrf_token(),
         "is_owner": _is_owner(),
@@ -497,6 +788,13 @@ def inject_globals():
         "show_workspace": show_workspace,
         "client_logo_url": _client_logo_url(),
         "client_org_name": org_name,
+        "client_team_role": team_role,
+        "client_can_search": _actor_search_enabled(store) if session.get(SESSION_ACTOR) else False,
+        "client_can_logs": _actor_can_view_logs(store) if session.get(SESSION_ACTOR) else False,
+        "client_can_dashboard": _actor_can_dashboard(store) if session.get(SESSION_ACTOR) else False,
+        "client_totp_enabled": client_security.totp_is_enabled(_actor_security_record(store))
+        if session.get(SESSION_ACTOR)
+        else False,
     }
 
 
@@ -595,15 +893,7 @@ def _update_session_search_context(store: Dict[str, Any], payload: Dict[str, Any
 
 
 def _fetch_account(store: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    base, token = _kryx_credentials(store)
-    if not base or not token:
-        return None
-    account = kryx_api.get_account_or_probe(base, token)
-    if account and account.get("account_endpoint_missing"):
-        last_credits = _config(store).get("last_known_credits")
-        if last_credits is not None:
-            account = dict(account)
-            account["credits"] = int(last_credits)
+    account, _err = _fetch_account_with_error(store)
     return account
 
 
@@ -667,7 +957,8 @@ def _usage_charts(store: Dict[str, Any], account: Optional[Dict[str, Any]]) -> D
 def index():
     if not session.get(SESSION_ACTOR):
         return redirect(url_for("login"))
-    return redirect(url_for("dashboard" if _is_owner() else "search"))
+    store = load_store()
+    return redirect(url_for(_home_endpoint_for_actor(store)))
 
 
 @app.route("/brand/logo")
@@ -730,33 +1021,145 @@ def login():
     store = load_store()
     cfg = _config(store)
     if request.method == "POST":
+        if login_rate_blocked(_client_ip()):
+            flash("Too many failed sign-in attempts. Try again in about 15 minutes.", "error")
+            return render_template("login.html", org_name=cfg.get("organization_name"), config=cfg)
+
         username = (request.form.get("username") or "").strip().lower()
         password = request.form.get("password") or ""
-        if username == (cfg.get("owner_username") or "").strip().lower():
+        is_owner_login = username == (cfg.get("owner_username") or "").strip().lower()
+        member = None if is_owner_login else team_by_username(store, username)
+
+        authenticated = False
+        must_change = False
+        sec: Dict[str, Any] = {}
+
+        if is_owner_login:
             if check_password_hash(cfg.get("owner_password_hash") or "", password):
-                session[SESSION_ROLE] = "owner"
-                session[SESSION_ACTOR] = username
-                append_audit(store, username, "login", "Owner signed in")
-                save_store(store)
-                return redirect(url_for("dashboard"))
-            flash("Invalid owner credentials.", "error")
-            return render_template("login.html", org_name=cfg.get("organization_name"), config=cfg)
-        member = team_by_username(store, username)
-        if member and check_password_hash(member.get("password_hash") or "", password):
-            session[SESSION_ROLE] = "team"
-            session[SESSION_ACTOR] = username
-            append_audit(store, username, "login", "Team member signed in")
+                authenticated = True
+                sec = _owner_security(store)
+        elif member and check_password_hash(member.get("password_hash") or "", password):
+            if not member.get("active", True):
+                flash("This account is inactive. Contact the workspace owner.", "error")
+                return render_template("login.html", org_name=cfg.get("organization_name"), config=cfg)
+            authenticated = True
+            must_change = bool(member.get("must_change_password"))
+            client_security.ensure_user_security(member)
+            sec = member
+
+        if not authenticated:
+            record_login_failure(_client_ip())
+            append_audit(store, username or "unknown", "login_failed", "Invalid credentials")
             save_store(store)
-            return redirect(url_for("search"))
-        flash("Invalid username or password.", "error")
+            flash("Invalid username or password.", "error")
+            return render_template("login.html", org_name=cfg.get("organization_name"), config=cfg)
+
+        clear_login_failures(_client_ip())
+
+        if client_security.totp_is_enabled(sec):
+            session[SESSION_PENDING_2FA_ACTOR] = username
+            session[SESSION_PENDING_2FA_AT] = str(time.time())
+            session[SESSION_ROLE] = "owner" if is_owner_login else "team"
+            if must_change:
+                session[SESSION_MUST_CHANGE_PASSWORD] = "1"
+            return redirect(url_for("verify_2fa"))
+
+        _complete_client_login(store, username, is_owner=is_owner_login)
+        if must_change:
+            _set_must_change_password(True)
+        append_audit(store, username, "login", "Owner signed in" if is_owner_login else "Team member signed in")
+        save_store(store)
+        return redirect(url_for(_home_endpoint_for_actor(store)))
+
     return render_template("login.html", org_name=cfg.get("organization_name"), config=cfg)
+
+
+@app.route("/verify-2fa", methods=["GET", "POST"])
+def verify_2fa():
+    store = load_store()
+    actor = _pending_2fa_actor()
+    if not actor:
+        return redirect(url_for("login"))
+    cfg = _config(store)
+    is_owner_login = actor == (cfg.get("owner_username") or "").strip().lower()
+    if is_owner_login:
+        sec = _owner_security(store)
+    else:
+        member = team_by_username(store, actor)
+        sec = member or {}
+        client_security.ensure_user_security(sec)
+    if request.method == "POST":
+        code = (request.form.get("totp_code") or "").strip()
+        ok = client_security.verify_totp_code(sec, code)
+        if not ok:
+            ok = client_security.consume_recovery_code(sec, SECURITY_PEPPER, code, _utc_now())
+        if not ok:
+            flash("Authenticator or recovery code did not match.", "error")
+            return render_template("verify_2fa.html", actor=actor)
+        must_change = bool(session.get(SESSION_MUST_CHANGE_PASSWORD))
+        _clear_pending_2fa()
+        _complete_client_login(store, actor, is_owner=is_owner_login)
+        if must_change:
+            _set_must_change_password(True)
+        append_audit(store, actor, "login", "2FA verified")
+        save_store(store)
+        return redirect(url_for("change_password" if _must_change_password() else _home_endpoint_for_actor(store)))
+    return render_template("verify_2fa.html", actor=actor)
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+@_require_login
+def change_password():
+    store = load_store()
+    cfg = _config(store)
+    actor = _actor_label()
+    is_owner_user = _is_owner()
+    member = _actor_member(store)
+    if request.method == "POST":
+        current = request.form.get("current_password") or ""
+        new_pw = (request.form.get("new_password") or "").strip()
+        confirm = (request.form.get("confirm_password") or "").strip()
+        if len(new_pw) < 8:
+            flash("New password must be at least 8 characters.", "error")
+        elif new_pw != confirm:
+            flash("New passwords do not match.", "error")
+        elif is_owner_user:
+            if not check_password_hash(cfg.get("owner_password_hash") or "", current):
+                flash("Current password is incorrect.", "error")
+            else:
+                cfg["owner_password_hash"] = generate_password_hash(new_pw)
+                store["config"] = cfg
+                _set_must_change_password(False)
+                append_audit(store, actor, "password_changed", "Owner password updated")
+                save_store(store)
+                flash("Password updated.", "info")
+                return redirect(url_for(_home_endpoint_for_actor(store)))
+        elif member:
+            if not check_password_hash(member.get("password_hash") or "", current):
+                flash("Current password is incorrect.", "error")
+            else:
+                member["password_hash"] = generate_password_hash(new_pw)
+                member["must_change_password"] = False
+                member["updated_at"] = _utc_now()
+                _set_must_change_password(False)
+                append_audit(store, actor, "password_changed", "Team password updated")
+                save_store(store)
+                flash("Password updated.", "info")
+                return redirect(url_for(_home_endpoint_for_actor(store)))
+        else:
+            flash("Account not found.", "error")
+    return render_template("change_password.html", forced=_must_change_password())
 
 
 @app.route("/logout")
 def logout():
     actor = _actor_label()
+    store = load_store()
     if actor != "unknown":
-        store = load_store()
+        sec = _actor_security_record(store)
+        sid = (session.get(SESSION_AUTH_SESSION_ID) or "").strip()
+        if sec and sid:
+            client_security.revoke_auth_session(sec, sid)
         append_audit(store, actor, "logout", "Signed out")
         save_store(store)
     session.clear()
@@ -771,6 +1174,25 @@ def settings():
     store = load_store()
     cfg = _config(store)
     if request.method == "POST":
+        action = (request.form.get("form_action") or "save").strip()
+        if action == "change_owner_password":
+            current = request.form.get("current_password") or ""
+            new_pw = (request.form.get("new_password") or "").strip()
+            confirm = (request.form.get("confirm_password") or "").strip()
+            if len(new_pw) < 8:
+                flash("New password must be at least 8 characters.", "error")
+            elif new_pw != confirm:
+                flash("New passwords do not match.", "error")
+            elif not check_password_hash(cfg.get("owner_password_hash") or "", current):
+                flash("Current owner password is incorrect.", "error")
+            else:
+                cfg["owner_password_hash"] = generate_password_hash(new_pw)
+                store["config"] = cfg
+                append_audit(store, _actor_label(), "password_changed", "Owner password updated in settings")
+                save_store(store)
+                flash("Owner password updated.", "info")
+                return redirect(url_for("settings"))
+
         kryx_url = (request.form.get("kryx_url") or cfg.get("kryx_url") or "").strip().rstrip("/")
         api_token = (request.form.get("api_token") or "").strip() or (cfg.get("api_token") or "").strip()
         org_name = (request.form.get("organization_name") or cfg.get("organization_name") or "My team").strip()
@@ -802,6 +1224,32 @@ def settings():
     return render_template("settings.html", config=cfg)
 
 
+@app.route("/dashboard/api/live", endpoint="dashboard_api_live")
+@_require_login
+@_require_owner
+def dashboard_api_live():
+    store = load_store()
+    account, api_error = _fetch_account_with_error(store)
+    base, _token = _kryx_credentials(store)
+    health = kryx_api.fetch_search_health(base) if base else {"reachable": False, "degraded": True}
+    return jsonify(
+        {
+            "ok": True,
+            "account_ok": account is not None and not api_error,
+            "api_error": api_error,
+            "account": {
+                "credits": int((account or {}).get("credits") or 0),
+                "monthly_search_used": int((account or {}).get("monthly_search_used") or 0),
+                "monthly_search_limit": int((account or {}).get("monthly_search_limit") or 0),
+            }
+            if account
+            else None,
+            "search_health": health,
+            "active_jobs": active_jobs_snapshot(CLIENT_SEARCH_JOBS),
+        }
+    )
+
+
 @app.route("/dashboard/api/system-memory", endpoint="dashboard_api_system_memory")
 @_require_login
 @_require_owner
@@ -821,19 +1269,110 @@ def dashboard_api_system_cpu():
 @_require_owner
 def dashboard():
     store = load_store()
-    account = _fetch_account(store)
+    account, api_error = _fetch_account_with_error(store)
     charts = _usage_charts(store, account)
+    data_store = client_store_snapshot(store)
+    base, _token = _kryx_credentials(store)
+    search_health = kryx_api.fetch_search_health(base) if base else None
+    flags = attention_flags(
+        store,
+        account,
+        api_error=api_error,
+        data_store_level=data_store.get("level") or "ok",
+        report_context_count=data_store.get("report_context_count") or 0,
+        report_context_max=data_store.get("report_context_max") or REPORT_CONTEXT_MAX,
+    )
     return render_template(
         "dashboard.html",
         account=account,
         charts=charts,
         config=_config(store),
         team_count=len(store.get("team", [])),
+        data_store=data_store,
+        attention_flags=flags,
+        api_error=api_error,
+        search_health=search_health or {},
+        recent_searches=recent_search_rows(store.get("search_logs", [])),
+        active_jobs=active_jobs_snapshot(CLIENT_SEARCH_JOBS),
+        security_sessions=client_security.active_session_count(_owner_security(store)),
+        owner_totp_enabled=client_security.totp_is_enabled(_owner_security(store)),
+    )
+
+
+@app.route("/my-dashboard")
+@_require_login
+def team_dashboard():
+    store = load_store()
+    if _is_owner():
+        return redirect(url_for("dashboard"))
+    role = _actor_team_role(store)
+    if role == "auditor":
+        return redirect(url_for("logs"))
+    if role not in {"investigator", "supervisor"}:
+        return redirect(url_for("search"))
+    account = _fetch_account(store)
+    actor = _actor_label()
+    usage = actor_usage_stats(store, actor, account)
+    charts = actor_usage_charts(store, actor, account)
+    flags = []
+    if account:
+        credits = int(account.get("credits") or 0)
+        monthly_limit = int(account.get("monthly_search_limit") or 0)
+        monthly_used = int(account.get("monthly_search_used") or 0)
+        if credits <= 5:
+            flags.append({"level": "warn", "title": f"Shared credits low ({credits})", "detail": "Inform the workspace owner."})
+        if monthly_limit > 0 and monthly_used >= max(1, int(monthly_limit * 0.9)):
+            flags.append({"level": "warn", "title": "Shared search cap almost reached", "detail": f"{monthly_used}/{monthly_limit} used on the Kryx account."})
+    if charts.get("failed_30d"):
+        flags.append(
+            {
+                "level": "warn",
+                "title": f"{charts['failed_30d']} failed search attempt(s) in the last 30 days",
+                "detail": "Review errors in your logs or retry when the upstream is healthy.",
+            }
+        )
+    return render_template(
+        "team_dashboard.html",
+        account=account,
+        usage=usage,
+        charts=charts,
+        attention_flags=flags,
+        recent_searches=recent_search_rows(
+            [r for r in store.get("search_logs", []) if (r.get("actor") or "").strip().lower() == actor.lower()],
+            limit=8,
+        ),
+        active_jobs=active_jobs_snapshot(CLIENT_SEARCH_JOBS, actor=actor),
+    )
+
+
+@app.route("/my-dashboard/api/live", endpoint="team_dashboard_api_live")
+@_require_login
+def team_dashboard_api_live():
+    store = load_store()
+    if not _actor_can_dashboard(store):
+        return jsonify({"ok": False, "error": "Forbidden."}), 403
+    account, api_error = _fetch_account_with_error(store)
+    actor = _actor_label()
+    return jsonify(
+        {
+            "ok": True,
+            "account_ok": account is not None and not api_error,
+            "api_error": api_error,
+            "account": {
+                "credits": int((account or {}).get("credits") or 0),
+                "monthly_search_used": int((account or {}).get("monthly_search_used") or 0),
+                "monthly_search_limit": int((account or {}).get("monthly_search_limit") or 0),
+            }
+            if account
+            else None,
+            "active_jobs": active_jobs_snapshot(CLIENT_SEARCH_JOBS, actor=actor),
+        }
     )
 
 
 @app.route("/search/jobs", methods=["POST"], endpoint="search_jobs_create")
 @_require_login
+@_require_search
 def search_jobs_create():
     """Start an async client search; browser polls GET /search/jobs/<id>."""
     store = load_store()
@@ -927,12 +1466,28 @@ def search_jobs_poll(job_id: str):
 
 @app.route("/search", methods=["GET", "POST"], endpoint="search")
 @_require_login
+@_require_search
 def search_page():
     store = load_store()
     account = _fetch_account(store)
     active_type = (request.form.get("search_type") or request.args.get("type") or "username").strip()
     if active_type not in SEARCH_TYPES:
         active_type = "username"
+    prefill: Dict[str, str] = {}
+    q = (request.args.get("q") or "").strip()
+    if request.args.get("first_name") or request.args.get("last_name"):
+        prefill["first_name"] = (request.args.get("first_name") or "").strip()
+        prefill["last_name"] = (request.args.get("last_name") or "").strip()
+    elif active_type == "username":
+        prefill["username"] = q
+    elif active_type == "phone":
+        prefill["phone"] = q
+    elif active_type == "email":
+        prefill["email"] = q
+    elif active_type == "plate_number":
+        prefill["plate_number"] = q
+    elif active_type == "passport_number":
+        prefill["passport_number"] = q
 
     if request.method == "POST":
         base, token = _kryx_credentials(store)
@@ -979,6 +1534,7 @@ def search_page():
         account=account,
         search_types=SEARCH_TYPES,
         active_type=active_type,
+        search_prefill=prefill,
     )
 
 
@@ -1019,6 +1575,7 @@ def search_report_context_sync():
 
 @app.route("/search/report", endpoint="search_report")
 @_require_login
+@_require_search
 def search_report():
     store = load_store()
     context_payload = _load_session_search_context(store)
@@ -1034,6 +1591,7 @@ def search_report():
 
 @app.route("/search/print")
 @_require_login
+@_require_search
 def search_print():
     store = load_store()
     context_payload = _load_session_search_context(store)
@@ -1045,6 +1603,7 @@ def search_print():
 
 @app.route("/search/export.csv")
 @_require_login
+@_require_search
 def search_export_csv():
     store = load_store()
     context_payload = _load_session_search_context(store)
@@ -1082,6 +1641,111 @@ def search_export_csv():
     )
 
 
+@app.route("/security", methods=["GET", "POST"])
+@_require_login
+def security():
+    store = load_store()
+    sec = _actor_security_record(store)
+    actor = _actor_label()
+    if request.method == "POST":
+        form_action = (request.form.get("form_action") or "").strip()
+        password = (request.form.get("current_password") or "").strip()
+        totp_code = (request.form.get("totp_code") or "").strip()
+
+        if form_action == "start_totp_setup":
+            if client_security.totp_is_enabled(sec):
+                flash("Two-factor authentication is already enabled.", "error")
+            else:
+                session[SESSION_TOTP_SETUP_SECRET] = client_security.generate_totp_secret()
+                flash("Scan the QR code, then enter a code from your authenticator app.", "info")
+            return redirect(url_for("security"))
+
+        if form_action == "confirm_totp_setup":
+            setup_secret = (session.get(SESSION_TOTP_SETUP_SECRET) or "").strip()
+            verify_code = (request.form.get("verify_code") or "").strip()
+            if not setup_secret:
+                flash("Start authenticator setup again.", "error")
+                return redirect(url_for("security"))
+            if not client_security.verify_totp_code({"totp_secret": setup_secret}, verify_code):
+                flash("Authenticator code did not match. Try again.", "error")
+                return redirect(url_for("security"))
+            issued = client_security.enable_totp(sec, setup_secret, SECURITY_PEPPER)
+            session.pop(SESSION_TOTP_SETUP_SECRET, None)
+            session[SESSION_RECOVERY_PLAIN] = issued
+            append_audit(store, actor, "totp_enabled", "2FA enabled")
+            save_store(store)
+            flash("Two-factor authentication is now enabled. Save your recovery codes.", "info")
+            return redirect(url_for("security"))
+
+        if form_action == "reset_totp":
+            cfg = _config(store)
+            if _is_owner():
+                if not check_password_hash(cfg.get("owner_password_hash") or "", password):
+                    flash("Current password is incorrect.", "error")
+                    return redirect(url_for("security"))
+            else:
+                member = _actor_member(store)
+                if not member or not check_password_hash(member.get("password_hash") or "", password):
+                    flash("Current password is incorrect.", "error")
+                    return redirect(url_for("security"))
+            if not client_security.verify_totp_code(sec, totp_code) and not client_security.consume_recovery_code(
+                sec, SECURITY_PEPPER, totp_code, _utc_now()
+            ):
+                flash("Authenticator or recovery code did not match.", "error")
+                return redirect(url_for("security"))
+            client_security.disable_totp(sec)
+            append_audit(store, actor, "totp_disabled", "2FA reset")
+            save_store(store)
+            flash("Two-factor authentication has been reset.", "info")
+            return redirect(url_for("security"))
+
+    setup_secret = (session.get(SESSION_TOTP_SETUP_SECRET) or "").strip()
+    recovery_plain = session.pop(SESSION_RECOVERY_PLAIN, None)
+    qr_url = ""
+    if setup_secret:
+        qr_url = client_security.totp_provisioning_uri(actor, setup_secret)
+    return render_template(
+        "security.html",
+        security_totp_enabled=client_security.totp_is_enabled(sec),
+        security_setup_pending=bool(setup_secret),
+        security_totp_qr_url=(
+            f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={quote(qr_url)}"
+            if qr_url
+            else ""
+        ),
+        security_recovery_plain=recovery_plain or [],
+        security_active_sessions=client_security.active_session_count(sec),
+    )
+
+
+@app.route("/security/sessions", methods=["GET", "POST"])
+@_require_login
+def security_sessions():
+    store = load_store()
+    sec = _actor_security_record(store)
+    current_sid = (session.get(SESSION_AUTH_SESSION_ID) or "").strip()
+    if request.method == "POST":
+        action = (request.form.get("form_action") or "").strip()
+        target_sid = (request.form.get("session_id") or "").strip()
+        if action == "revoke" and target_sid:
+            client_security.revoke_auth_session(sec, target_sid)
+            append_audit(store, _actor_label(), "session_revoked", target_sid[:8])
+            save_store(store)
+            flash("Session revoked.", "info")
+        elif action == "revoke_others":
+            removed = client_security.revoke_other_auth_sessions(sec, current_sid)
+            append_audit(store, _actor_label(), "session_revoked_others", f"{removed} removed")
+            save_store(store)
+            flash("Other sessions signed out.", "info")
+        return redirect(url_for("security_sessions"))
+    sessions = client_security.list_auth_sessions(sec)
+    return render_template(
+        "security_sessions.html",
+        security_sessions=sessions,
+        security_current_session_id=current_sid,
+    )
+
+
 @app.route("/team", methods=["GET", "POST"])
 @_require_login
 @_require_owner
@@ -1101,6 +1765,8 @@ def team():
             elif team_by_username(store, username):
                 flash("Username already exists.", "error")
             else:
+                role = normalize_team_role(request.form.get("role"))
+                force_reset = request.form.get("must_change_password") == "1"
                 store.setdefault("team", []).append(
                     {
                         "id": new_id(),
@@ -1108,6 +1774,9 @@ def team():
                         "display_name": display_name,
                         "password_hash": generate_password_hash(password),
                         "active": True,
+                        "role": role,
+                        "search_enabled": request.form.get("search_enabled") == "1",
+                        "must_change_password": force_reset,
                         "created_at": _utc_now(),
                         "updated_at": _utc_now(),
                     }
@@ -1126,8 +1795,13 @@ def team():
                 password = (request.form.get("password") or "").strip()
                 member["display_name"] = display_name or member.get("username")
                 member["active"] = request.form.get("active") == "1"
+                member["role"] = normalize_team_role(request.form.get("role") or member.get("role"))
+                member["search_enabled"] = request.form.get("search_enabled") == "1"
+                if request.form.get("must_change_password") == "1":
+                    member["must_change_password"] = True
                 if password:
                     member["password_hash"] = generate_password_hash(password)
+                    member["must_change_password"] = request.form.get("must_change_password") == "1"
                 member["updated_at"] = _utc_now()
                 append_audit(store, _actor_label(), "team_update", member.get("username", ""))
                 save_store(store)
@@ -1148,15 +1822,78 @@ def team():
 
 @app.route("/logs")
 @_require_login
-@_require_owner
+@_require_logs
 def logs():
     store = load_store()
     tab = (request.args.get("tab") or "search").strip()
+    scope = _actor_logs_scope(store)
+    actor = _actor_label()
+    search_logs = list(store.get("search_logs", []))
+    if scope == "own":
+        search_logs = [
+            r for r in search_logs if (r.get("actor") or "").strip().lower() == actor.lower()
+        ]
+    for row in search_logs:
+        st = (row.get("search_type") or "").strip()
+        val = (row.get("query_value") or "").strip()
+        row["display_value_masked"] = mask_search_display_value(st, val)
+        row["display_value_full"] = val or "—"
+    audit_logs = store.get("audit_logs", []) if scope == "all" else []
     return render_template(
         "logs.html",
         tab=tab,
-        audit_logs=store.get("audit_logs", [])[:200],
-        search_logs=store.get("search_logs", [])[:200],
+        audit_logs=audit_logs[:200],
+        search_logs=search_logs[:200],
+        logs_scope=scope,
+    )
+
+
+@app.route("/logs/export.csv")
+@_require_login
+@_require_logs
+def logs_export_csv():
+    store = load_store()
+    tab = (request.args.get("tab") or "search").strip()
+    scope = _actor_logs_scope(store)
+    actor = _actor_label()
+    rows = io.StringIO()
+    writer = csv.writer(rows)
+    if tab == "audit" and scope == "all":
+        writer.writerow(["created_at", "actor", "action", "details"])
+        for row in store.get("audit_logs", []):
+            writer.writerow(
+                [
+                    row.get("created_at") or "",
+                    row.get("actor") or "",
+                    row.get("action") or "",
+                    row.get("details") or "",
+                ]
+            )
+        filename = "client-audit-logs.csv"
+    else:
+        writer.writerow(["created_at", "actor", "search_type", "query_value", "ok", "credits_remaining", "error"])
+        search_logs = store.get("search_logs", [])
+        if scope == "own":
+            search_logs = [
+                r for r in search_logs if (r.get("actor") or "").strip().lower() == actor.lower()
+            ]
+        for row in search_logs:
+            writer.writerow(
+                [
+                    row.get("created_at") or "",
+                    row.get("actor") or "",
+                    row.get("search_type") or "",
+                    row.get("query_value") or "",
+                    "yes" if row.get("ok") else "no",
+                    row.get("credits_remaining") if row.get("credits_remaining") is not None else "",
+                    row.get("error") or "",
+                ]
+            )
+        filename = "client-search-logs.csv"
+    return Response(
+        rows.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
     )
 
 

@@ -18,6 +18,15 @@
       <label class="login-field"><span class="login-label">Username</span><input class="login-input" name="username" required /></label>
       <label class="login-field"><span class="login-label">Display name</span><input class="login-input" name="display_name" /></label>
       <label class="login-field"><span class="login-label">Password</span><input class="login-input" type="password" name="password" required autocomplete="new-password" /></label>
+      <label class="login-field"><span class="login-label">Role</span>
+        <select class="login-input" name="role">
+          <option value="investigator">Investigator (search only)</option>
+          <option value="supervisor">Supervisor (search + own logs)</option>
+          <option value="auditor">Auditor (logs only)</option>
+        </select>
+      </label>
+      <label class="login-field client-checkbox-field"><input type="checkbox" name="must_change_password" value="1" checked /> <span>Require password change on first sign-in</span></label>
+      <label class="login-field client-checkbox-field"><input type="checkbox" name="search_enabled" value="1" checked /> <span>Search enabled</span></label>
       <div class="admin-modal-actions admin-modal-actions--full">
         <button class="btn-primary" type="submit">Add member</button>
       </div>
@@ -32,6 +41,7 @@
           <tr>
             <th>Username</th>
             <th>Display name</th>
+            <th>Role</th>
             <th>Status</th>
             <th>Created</th>
             <th>Updated</th>
@@ -43,6 +53,7 @@
           <tr>
             <td><code class="client-team-username">{{ member.username }}</code></td>
             <td>{{ member.display_name or member.username }}</td>
+            <td>{{ (member.role or 'investigator')|replace('_', ' ')|title }}</td>
             <td>
               {% if member.active %}
               <span class="client-team-badge client-team-badge--active">Active</span>
@@ -63,6 +74,8 @@
                 data-username="{{ member.username }}"
                 data-display-name="{{ member.display_name or member.username }}"
                 data-active="{{ '1' if member.active else '0' }}"
+                data-role="{{ member.role or 'investigator' }}"
+                data-search-enabled="{{ '1' if member.search_enabled is not defined or member.search_enabled else '0' }}"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 20h9"></path>
@@ -90,7 +103,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="6">No team members yet. Add one above.</td>
+            <td colspan="7">No team members yet. Add one above.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -121,9 +134,25 @@
         <span class="login-label">New password</span>
         <input class="login-input" type="password" name="password" id="client-team-edit-password" placeholder="Leave blank to keep current" autocomplete="new-password" />
       </label>
+      <label class="login-field">
+        <span class="login-label">Role</span>
+        <select class="login-input" name="role" id="client-team-edit-role">
+          <option value="investigator">Investigator (search only)</option>
+          <option value="supervisor">Supervisor (search + own logs)</option>
+          <option value="auditor">Auditor (logs only)</option>
+        </select>
+      </label>
       <label class="remember-wrap admin-field-full">
         <input type="checkbox" name="active" id="client-team-edit-active" value="1" />
-        <span>Active — can sign in and run searches</span>
+        <span>Active — can sign in</span>
+      </label>
+      <label class="remember-wrap admin-field-full">
+        <input type="checkbox" name="search_enabled" id="client-team-edit-search-enabled" value="1" />
+        <span>Search enabled</span>
+      </label>
+      <label class="remember-wrap admin-field-full">
+        <input type="checkbox" name="must_change_password" id="client-team-edit-must-change" value="1" />
+        <span>Require password change on next sign-in</span>
       </label>
       <div class="admin-modal-actions admin-modal-actions--full">
         <button type="button" class="btn-secondary-outline" data-team-edit-close="1">Cancel</button>

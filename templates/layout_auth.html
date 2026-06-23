@@ -9,20 +9,13 @@
     <span class="client-auth-orb client-auth-orb--c"></span>
   </div>
   <section class="login-page-shell px-6 py-12 md:py-16 client-auth-main">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="login-flash-stack client-flash-stack client-flash-stack--auth" role="alert">
-      {% for category, message in messages %}
-      <p class="login-flash login-flash--{{ category }}">{{ message }}</p>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
     {% block page %}{% endblock %}
   </section>
+  {% include "partials/flash_toasts.html" %}
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='hero-dots-interaction.js') }}" defer></script>
 <script src="{{ url_for('static', filename='client-auth.js') }}" defer></script>
+<script src="{{ url_for('static', filename='client-toasts.js') }}" defer></script>
 {% endblock %}

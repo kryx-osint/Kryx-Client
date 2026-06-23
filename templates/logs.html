@@ -6,16 +6,27 @@
     <div>
       <p class="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-2">Audit</p>
       <h1 class="text-2xl font-bold">Logs</h1>
+      {% if logs_scope == 'own' %}
+      <p class="text-sm text-muted-foreground mt-2">Showing your search activity only.</p>
+      {% endif %}
+    </div>
+    <div class="admin-head-actions flex gap-2 flex-wrap">
+      <button type="button" class="btn-secondary-outline text-sm" id="client-logs-reveal-toggle" aria-pressed="false">Show query values</button>
+      <a href="{{ url_for('logs_export_csv', tab=tab) }}" class="btn-secondary-outline workspace-intel-action-btn">Export CSV</a>
     </div>
   </header>
 
   <nav class="admin-tabs client-tab-bar" aria-label="Log type">
+    {% if logs_scope == 'all' %}
     <a href="{{ url_for('logs', tab='search') }}" class="admin-tab{% if tab == 'search' %} admin-tab--active{% endif %}">Search logs</a>
     <a href="{{ url_for('logs', tab='audit') }}" class="admin-tab{% if tab == 'audit' %} admin-tab--active{% endif %}">Audit logs</a>
+    {% else %}
+    <span class="admin-tab admin-tab--active">Search logs</span>
+    {% endif %}
   </nav>
 
   <div class="admin-panel admin-panel--raised mt-4">
-    {% if tab == 'audit' %}
+    {% if tab == 'audit' and logs_scope == 'all' %}
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
@@ -43,7 +54,7 @@
             <td>{{ row.created_at }}</td>
             <td>{{ row.actor }}</td>
             <td>{{ row.search_type }}</td>
-            <td>{{ row.query_value }}</td>
+            <td><span class="client-log-query-value" data-masked="{{ row.display_value_masked }}" data-full="{{ row.display_value_full }}">{{ row.display_value_masked }}</span></td>
             <td>{% if row.ok %}OK{% else %}{{ row.error or 'Failed' }}{% endif %}</td>
             <td>{{ row.credits_remaining if row.credits_remaining is not none else '—' }}</td>
           </tr>
@@ -56,4 +67,8 @@
     {% endif %}
   </div>
 </section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='client-privacy-toggle.js') }}" defer></script>
 {% endblock %}

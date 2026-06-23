@@ -1,0 +1,44 @@
+{% extends "layout_workspace.html" %}
+{% block title %}Sessions — Kryx Client{% endblock %}
+{% block page %}
+<section class="client-page-shell admin-shell max-w-3xl">
+  <header class="admin-head mb-6">
+    <h1 class="text-2xl font-bold">Active sessions</h1>
+    <p class="text-sm text-muted-foreground mt-2">Sign out devices you do not recognize.</p>
+  </header>
+
+  {% if security_sessions|length > 1 %}
+  <form method="post" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="hidden" name="form_action" value="revoke_others" />
+    <button type="submit" class="btn-secondary-outline">Sign out all other devices</button>
+  </form>
+  {% endif %}
+
+  <div class="admin-panel admin-panel--raised">
+    <ul class="client-session-list">
+      {% for row in security_sessions %}
+      <li class="client-session-item">
+        <div>
+          <p class="font-semibold text-sm">{{ row.user_agent or 'Unknown device' }}</p>
+          <p class="text-xs text-muted-foreground">{{ row.ip or '—' }} · Last seen {{ row.last_seen or row.created_at }}</p>
+        </div>
+        {% if row.id == security_current_session_id %}
+        <span class="client-team-badge client-team-badge--active">This device</span>
+        {% else %}
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="form_action" value="revoke" />
+          <input type="hidden" name="session_id" value="{{ row.id }}" />
+          <button type="submit" class="btn-secondary-outline text-xs">Revoke</button>
+        </form>
+        {% endif %}
+      </li>
+      {% else %}
+      <li class="text-muted-foreground text-sm">No active sessions recorded.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <p class="mt-4"><a href="{{ url_for('security') }}" class="link-animated link-animated-cyan">← Security</a></p>
+</section>
+{% endblock %}

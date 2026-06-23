@@ -34,12 +34,18 @@
     var displayInput = document.getElementById("client-team-edit-display");
     var passwordInput = document.getElementById("client-team-edit-password");
     var activeInput = document.getElementById("client-team-edit-active");
+    var roleInput = document.getElementById("client-team-edit-role");
+    var searchEnabledInput = document.getElementById("client-team-edit-search-enabled");
+    var mustChangeInput = document.getElementById("client-team-edit-must-change");
     var subtitle = document.getElementById("client-team-edit-subtitle");
     if (idInput) idInput.value = data.id || "";
     if (usernameInput) usernameInput.value = data.username || "";
     if (displayInput) displayInput.value = data.displayName || data.username || "";
     if (passwordInput) passwordInput.value = "";
     if (activeInput) activeInput.checked = data.active === "1";
+    if (roleInput) roleInput.value = data.role || "investigator";
+    if (searchEnabledInput) searchEnabledInput.checked = data.searchEnabled !== "0";
+    if (mustChangeInput) mustChangeInput.checked = false;
     if (subtitle) {
       subtitle.textContent = data.username ? "Member: " + data.username : "";
     }
@@ -70,6 +76,8 @@
         username: btn.getAttribute("data-username") || "",
         displayName: btn.getAttribute("data-display-name") || "",
         active: btn.getAttribute("data-active") || "0",
+        role: btn.getAttribute("data-role") || "investigator",
+        searchEnabled: btn.getAttribute("data-search-enabled") || "1",
       });
     });
   });

@@ -59,6 +59,17 @@
       </div>
     </div>
 
+    <div class="admin-panel admin-panel--raised mb-6">
+      <h2 class="text-lg font-semibold mb-1">Owner sign-in password</h2>
+      <p class="text-sm text-muted-foreground mb-4">Change the password used to sign in to this client app (not your Kryx account password).</p>
+      <div class="client-settings-fields">
+        <label class="login-field"><span class="login-label">Current password</span><input class="login-input" type="password" name="current_password" autocomplete="current-password" /></label>
+        <label class="login-field"><span class="login-label">New password</span><input class="login-input" type="password" name="new_password" autocomplete="new-password" minlength="8" /></label>
+        <label class="login-field"><span class="login-label">Confirm new password</span><input class="login-input" type="password" name="confirm_password" autocomplete="new-password" minlength="8" /></label>
+      </div>
+      <button type="submit" class="btn-secondary-outline mt-3" name="form_action" value="change_owner_password">Update owner password</button>
+    </div>
+
     <div class="admin-panel admin-panel--raised">
       <h2 class="text-lg font-semibold mb-1">Kryx API connection</h2>
       <p class="text-sm text-muted-foreground mb-4">

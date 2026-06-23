@@ -310,6 +310,34 @@
         },
       });
     }
+
+    var typesEl = document.getElementById("chart-types");
+    if (typesEl && (C.type_labels || []).length) {
+      new Chart(typesEl, {
+        type: "doughnut",
+        data: {
+          labels: C.type_labels || [],
+          datasets: [
+            {
+              data: C.type_counts || [],
+              backgroundColor: [
+                "rgba(0, 210, 239, 0.85)",
+                "rgba(5, 223, 114, 0.8)",
+                "rgba(252, 187, 0, 0.8)",
+                "rgba(136, 136, 160, 0.65)",
+                "rgba(255, 99, 132, 0.75)",
+              ],
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom" } },
+        },
+      });
+    }
   }
 
   if (document.readyState === "loading") {

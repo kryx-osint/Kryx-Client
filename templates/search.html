@@ -13,6 +13,11 @@
       <p class="text-sm text-muted-foreground mt-2">
         Shared credits: <strong>{{ account.credits }}</strong> · Period: {{ account.monthly_search_used }}/{{ account.monthly_search_limit }}
       </p>
+      {% if account.credits is defined and account.credits <= 5 %}
+      <p class="login-flash login-flash--error mt-2">Shared credits low: {{ account.credits }} remaining.</p>
+      {% elif account.monthly_search_limit and account.monthly_search_used >= (account.monthly_search_limit * 0.9) %}
+      <p class="login-flash login-flash--error mt-2">Shared search cap almost reached: {{ account.monthly_search_used }}/{{ account.monthly_search_limit }}.</p>
+      {% endif %}
       {% endif %}
     </div>
 
